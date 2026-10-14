@@ -36,8 +36,9 @@ class ScanEventsJob implements ShouldQueue
             $categories = Categories::forFilters($scan->filters);
             $sources = Source::scannableFor($categories)->orderBy('name')->get();
 
-            $text = $ai->searchWeb($prompts->forWebSearch($scan->filters, $categories, $sources));
-            $found = $importer->import($importer->parse($text), $categories);
+            $result = $ai->searchWeb($prompts->forWebSearch($scan->filters, $categories, $sources));
+            Scan::addUsage($scan->id, $result);
+            $found = count($importer->import($importer->parse($result->text), $categories));
             $scan->update(['status' => 'done', 'found' => $found]);
         } catch (\Throwable $e) {
             Log::error('Scan agenda en échec', ['scan' => $scan->id, 'error' => $e->getMessage()]);

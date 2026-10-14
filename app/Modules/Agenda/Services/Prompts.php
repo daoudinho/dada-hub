@@ -10,9 +10,6 @@ use App\Modules\Agenda\Models\Source;
  */
 class Prompts
 {
-    /** Nombre de jours couverts par un scan. */
-    public const DAYS = 60;
-
     /**
      * Extraction depuis le contenu d'une page agenda (mode « sources »).
      *
@@ -79,12 +76,18 @@ TXT;
     }
 
     /**
+     * Dernier jour couvert par un scan (config agenda.days).
+     */
+    public function until(): string
+    {
+        return now('Europe/Madrid')->addDays((int) config('agenda.days'))->toDateString();
+    }
+
+    /**
      * @return array{0: string, 1: string}
      */
     private function window(): array
     {
-        $now = now('Europe/Madrid');
-
-        return [$now->toDateString(), $now->copy()->addDays(self::DAYS)->toDateString()];
+        return [now('Europe/Madrid')->toDateString(), $this->until()];
     }
 }

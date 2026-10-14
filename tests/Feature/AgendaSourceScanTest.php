@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Agenda\Jobs\ScanSourceJob;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
+use App\Modules\Agenda\Services\FirecrawlClient;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -98,7 +99,7 @@ class AgendaSourceScanTest extends TestCase
     public function test_unchanged_page_is_not_sent_to_the_ai(): void
     {
         $this->fakeApis('Concert le 20 octobre');
-        $source = Source::factory()->create(['content_hash' => sha1('Concert le 20 octobre')]);
+        $source = Source::factory()->create(['content_hash' => app(FirecrawlClient::class)->fingerprint('Concert le 20 octobre')]);
         $scan = Scan::create(['filters' => ['musique'], 'mode' => 'sources', 'sources_total' => 1]);
 
         ScanSourceJob::dispatchSync($scan->id, $source->id, ['musique']);
@@ -112,7 +113,7 @@ class AgendaSourceScanTest extends TestCase
     public function test_force_option_reanalyses_unchanged_page(): void
     {
         $this->fakeApis('Concert le 20 octobre');
-        $source = Source::factory()->create(['content_hash' => sha1('Concert le 20 octobre')]);
+        $source = Source::factory()->create(['content_hash' => app(FirecrawlClient::class)->fingerprint('Concert le 20 octobre')]);
         $scan = Scan::create(['filters' => ['musique'], 'mode' => 'sources', 'sources_total' => 1]);
 
         ScanSourceJob::dispatchSync($scan->id, $source->id, ['musique'], true);

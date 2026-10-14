@@ -60,13 +60,14 @@ class AgendaController extends Controller
             'filters.*' => Rule::in(array_keys(Categories::FILTERS)),
             'mode' => ['nullable', Rule::in(['sources', 'web'])],
             'force' => 'nullable|boolean',
+            'batch' => 'nullable|boolean',
         ]);
 
         if ($running = $launcher->running()) {
             return response()->json($this->scanPayload($running));
         }
 
-        $scan = $launcher->start($data['filters'], $data['mode'] ?? 'sources', (bool) ($data['force'] ?? false));
+        $scan = $launcher->start($data['filters'], $data['mode'] ?? 'sources', (bool) ($data['force'] ?? false), (bool) ($data['batch'] ?? false));
 
         return response()->json($this->scanPayload($scan->fresh()), 202);
     }
@@ -81,7 +82,10 @@ class AgendaController extends Controller
      */
     private function scanPayload(Scan $scan): array
     {
-        return $scan->only(['id', 'mode', 'status', 'found', 'error', 'sources_total', 'sources_done'])
+        return $scan->only([
+            'id', 'mode', 'batch', 'status', 'found', 'error', 'sources_total', 'sources_done', 'sources_skipped',
+            'ai_calls', 'input_tokens', 'output_tokens', 'firecrawl_credits', 'cost_usd',
+        ])
             + ['age' => (int) $scan->created_at->diffInSeconds(now())];
     }
 }

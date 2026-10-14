@@ -14,6 +14,8 @@
 .hub { max-width: 720px; display: flex; gap: 16px; }
 h1 { font-size: 24px; font-weight: 600; margin: 4px 6px 4px; letter-spacing: -0.01em; }
 .sub { color: var(--muted); font-size: 14px; margin: 0 6px 16px; line-height: 1.45; }
+.usage { background: var(--bg); border-radius: 18px; margin: 0 4px 14px; padding: 12px 16px; font-size: 14px; line-height: 1.5; }
+.usage ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
 .flash { background: var(--chip); color: var(--chip-fg); border-radius: 16px; padding: 10px 16px; margin: 0 4px 14px; font-size: 15px; }
 .errors { color: var(--bad); font-size: 14px; margin: 6px 0 0; padding-left: 18px; }
 details.box { background: var(--bg); border-radius: 18px; margin: 0 4px 14px; padding: 4px 16px; }
@@ -66,6 +68,23 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
     <div class="flash" role="status">{{ session('status') }}</div>
   @endif
 
+  @if ($lastScan)
+    <div class="usage">
+      <strong>Dernier scan</strong> · {{ $lastScan->created_at->timezone('Europe/Madrid')->format('d/m H:i') }}
+      @if ($lastScan->mode === 'web') · recherche web @elseif ($lastScan->batch) · API Batch @endif
+      · {{ ['pending' => 'en attente', 'running' => 'en cours', 'waiting' => 'en attente du lot Batch', 'done' => 'terminé', 'failed' => 'échec'][$lastScan->status] ?? $lastScan->status }}
+      <ul>
+        @if ($lastScan->mode === 'sources')
+          <li>{{ $lastScan->sources_done }} / {{ $lastScan->sources_total }} source(s) analysée(s){{ $lastScan->sources_skipped ? ', '.$lastScan->sources_skipped.' récente(s) ignorée(s)' : '' }}</li>
+        @endif
+        <li>{{ $lastScan->found }} événement(s) ajouté(s) ou mis à jour</li>
+        <li>{{ $lastScan->ai_calls }} appel(s) IA · {{ number_format($lastScan->input_tokens, 0, ',', ' ') }} tokens en entrée · {{ number_format($lastScan->output_tokens, 0, ',', ' ') }} en sortie</li>
+        <li>{{ $lastScan->firecrawl_credits }} crédit(s) Firecrawl</li>
+        <li>Coût IA estimé : {{ $lastScan->cost_usd !== null ? number_format($lastScan->cost_usd, 4, ',', ' ').' $' : ($lastScan->ai_calls ? 'inconnu (prix du modèle non renseigné)' : '0 $') }}</li>
+      </ul>
+    </div>
+  @endif
+
   <details class="box" @if ($errors->create->any()) open @endif>
     <summary>Ajouter une source</summary>
     <form class="grid" method="POST" action="{{ route('agenda.sources.store') }}">
@@ -81,7 +100,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
           </select>
         </label>
       </div>
-      <label class="f">URL de la page agenda / programmation<input name="url" type="url" required maxlength="500" value="{{ old('url') }}" placeholder="https://…"></label>
+      <div class="row">
+        <label class="f">URL de la page agenda / programmation<input name="url" type="url" required maxlength="500" value="{{ old('url') }}" placeholder="https://…"></label>
+        <label class="f">Scanner tous les (jours)<input name="scan_every_days" type="number" min="1" max="365" value="{{ old('scan_every_days', config('agenda.default_scan_every_days')) }}"></label>
+      </div>
       @if ($errors->create->any())
         <ul class="errors">@foreach ($errors->create->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
       @endif
@@ -107,13 +129,16 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
             <span class="tag">Toutes</span>
           @endif
           <span>{{ $source->events_count }} événement(s)</span>
-          @if ($source->last_scanned_at)
+          <span>tous les {{ $source->scan_every_days }} j</span>
+          @if ($source->last_status === 'batch')
+            <span class="st-unchanged">extraction en attente (API Batch)</span>
+          @elseif ($source->last_scanned_at)
             <span>
               Dernier scan {{ $source->last_scanned_at->timezone('Europe/Madrid')->format('d/m H:i') }} :
               @switch($source->last_status)
-                @case('ok') <span class="st-ok">{{ $source->last_found }} trouvé(s)</span> @break
+                @case('ok') <span class="st-ok">{{ $source->last_found }} trouvé(s)</span> · {{ number_format($source->last_input_tokens + $source->last_output_tokens, 0, ',', ' ') }} tokens @break
                 @case('unchanged') <span class="st-unchanged">page inchangée</span> @break
-                @case('failed') <span class="st-failed">échec</span> @break
+                @case('failed') <span class="st-failed">échec{{ $source->failures > 1 ? ' ('.$source->failures.' de suite)' : '' }}</span> @break
               @endswitch
             </span>
           @else
@@ -138,7 +163,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
                 </select>
               </label>
             </div>
-            <label class="f">URL<input name="url" type="url" required maxlength="500" value="{{ $bag->any() ? old('url') : $source->url }}"></label>
+            <div class="row">
+              <label class="f">URL<input name="url" type="url" required maxlength="500" value="{{ $bag->any() ? old('url') : $source->url }}"></label>
+              <label class="f">Scanner tous les (jours)<input name="scan_every_days" type="number" min="1" max="365" required value="{{ $bag->any() ? old('scan_every_days') : $source->scan_every_days }}"></label>
+            </div>
             @if ($bag->any())
               <ul class="errors">@foreach ($bag->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
             @endif

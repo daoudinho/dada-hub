@@ -67,8 +67,16 @@ class AgendaSourceSeeder extends Seeder
             ['FC Barcelone · Ligue des champions', 'https://es.uefa.com/uefachampionsleague/clubs/50080--barcelona/matches/', 'barca', true],
         ];
 
+        // Les expositions changent rarement : un scan toutes les deux semaines suffit.
+        $every = ['expo' => 14, 'photo' => 14];
+
         foreach ($rows as [$name, $url, $category, $active]) {
-            Source::firstOrCreate(['url' => $url], ['name' => $name, 'category' => $category, 'active' => $active]);
+            Source::firstOrCreate(['url' => $url], [
+                'name' => $name,
+                'category' => $category,
+                'active' => $active,
+                'scan_every_days' => $every[$category] ?? config('agenda.default_scan_every_days'),
+            ]);
         }
     }
 }

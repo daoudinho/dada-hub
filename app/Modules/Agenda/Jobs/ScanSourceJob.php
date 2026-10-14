@@ -2,12 +2,13 @@
 
 namespace App\Modules\Agenda\Jobs;
 
+use App\Modules\Agenda\Models\AiRequest;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
 use App\Modules\Agenda\Services\AiClient;
-use App\Modules\Agenda\Services\EventImporter;
 use App\Modules\Agenda\Services\FirecrawlClient;
 use App\Modules\Agenda\Services\Prompts;
+use App\Modules\Agenda\Services\SourceExtraction;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +18,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Analyse une source : Firecrawl récupère la page, l'IA en extrait les événements.
- * Si la page n'a pas changé depuis le dernier passage, l'IA n'est pas appelée.
+ * Si la programmation n'a pas changé depuis le dernier passage, l'IA n'est pas appelée.
+ * En mode batch, l'extraction est mise de côté pour un lot de l'API Batch (moitié prix).
  */
 class ScanSourceJob implements ShouldQueue
 {
@@ -30,9 +32,15 @@ class ScanSourceJob implements ShouldQueue
     /**
      * @param  array<int, string>  $categories
      */
-    public function __construct(public int $scanId, public int $sourceId, public array $categories, public bool $force = false) {}
+    public function __construct(
+        public int $scanId,
+        public int $sourceId,
+        public array $categories,
+        public bool $force = false,
+        public bool $batchAi = false,
+    ) {}
 
-    public function handle(FirecrawlClient $firecrawl, AiClient $ai, EventImporter $importer, Prompts $prompts): void
+    public function handle(FirecrawlClient $firecrawl, AiClient $ai, Prompts $prompts, SourceExtraction $extraction): void
     {
         if ($this->batch()?->cancelled()) {
             return;
@@ -47,28 +55,34 @@ class ScanSourceJob implements ShouldQueue
                 return;
             }
 
-            $markdown = $firecrawl->scrape($source->url);
-            $hash = sha1($markdown);
+            $page = $firecrawl->scrape($source->url);
+            Scan::addUsage($this->scanId, firecrawlCredits: $page->credits);
 
-            if (! $this->force && $source->content_hash === $hash) {
-                $source->update(['last_status' => 'unchanged', 'last_error' => null, 'last_scanned_at' => now()]);
+            if (! $this->force && $source->content_hash === $page->fingerprint) {
+                $source->markScanned('unchanged');
 
                 return;
             }
 
-            $text = $ai->extractEvents($prompts->forPage($source, $markdown, $this->categories), $this->categories);
-            $found = $importer->import($importer->parse($text), $this->categories, $source);
+            $prompt = $prompts->forPage($source, $page->markdown, $this->categories);
 
-            $source->update([
-                'content_hash' => $hash,
-                'last_status' => 'ok',
-                'last_error' => null,
-                'last_found' => $found,
-                'last_scanned_at' => now(),
-            ]);
+            if ($this->batchAi) {
+                AiRequest::create([
+                    'scan_id' => $this->scanId,
+                    'source_id' => $source->id,
+                    'content_hash' => $page->fingerprint,
+                    'categories' => $this->categories,
+                    'prompt' => $prompt,
+                ]);
+                $source->update(['last_status' => 'batch', 'last_error' => null]);
+
+                return;
+            }
+
+            $found = $extraction->apply($this->scanId, $source, $page->fingerprint, $this->categories, $ai->extractEvents($prompt, $this->categories));
         } catch (\Throwable $e) {
             Log::warning('Scan agenda : source en échec', ['source' => $this->sourceId, 'error' => $e->getMessage()]);
-            $source?->update(['last_status' => 'failed', 'last_error' => mb_substr($e->getMessage(), 0, 500), 'last_scanned_at' => now()]);
+            $source?->markFailed($e->getMessage());
         } finally {
             Scan::whereKey($this->scanId)->incrementEach(['sources_done' => 1, 'found' => $found]);
         }

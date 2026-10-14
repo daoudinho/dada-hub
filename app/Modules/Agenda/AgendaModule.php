@@ -2,6 +2,7 @@
 
 namespace App\Modules\Agenda;
 
+use App\Modules\Agenda\Console\DedupeCommand;
 use App\Modules\Agenda\Console\ScanCommand;
 use App\Modules\Module;
 
@@ -29,6 +30,6 @@ class AgendaModule extends Module
 
     public function consoleCommands(): array
     {
-        return [ScanCommand::class];
+        return [ScanCommand::class, DedupeCommand::class];
     }
 }

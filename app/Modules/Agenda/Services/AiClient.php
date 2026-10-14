@@ -2,6 +2,8 @@
 
 namespace App\Modules\Agenda\Services;
 
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -10,37 +12,9 @@ use RuntimeException;
  */
 class AiClient
 {
-    /**
-     * Recherche web libre (mode « web ») : le modèle cherche lui-même. Coûteux en tokens.
-     */
-    public function searchWeb(string $prompt): string
-    {
-        return match ($this->provider()) {
-            'openai' => $this->openAi($prompt, (string) config('services.openai.model'), webSearch: true),
-            'anthropic' => $this->anthropic($prompt, (string) config('services.anthropic.model'), webSearch: true),
-        };
-    }
+    use RetriesTransientErrors;
 
-    /**
-     * Extraction d'événements depuis un texte fourni (mode « sources ») : sans recherche web,
-     * avec le modèle économique, et un schéma JSON imposé quand le fournisseur le permet.
-     *
-     * @param  array<int, string>  $categories
-     */
-    public function extractEvents(string $prompt, array $categories): string
-    {
-        return match ($this->provider()) {
-            'openai' => $this->openAi(
-                $prompt,
-                (string) config('services.openai.extract_model'),
-                schema: $this->eventsSchema($categories),
-                reasoning: config('services.openai.extract_reasoning') ?: null,
-            ),
-            'anthropic' => $this->anthropic($prompt, (string) config('services.anthropic.extract_model')),
-        };
-    }
-
-    private function provider(): string
+    public function provider(): string
     {
         $provider = config('services.agenda.provider');
         if (! in_array($provider, ['openai', 'anthropic'], true)) {
@@ -50,34 +24,75 @@ class AiClient
         return $provider;
     }
 
-    /**
-     * @param  array<string, mixed>|null  $schema
-     */
-    private function openAi(string $prompt, string $model, bool $webSearch = false, ?array $schema = null, ?string $reasoning = null): string
+    /** L'API Batch (moitié prix, réponse différée) n'est branchée que pour OpenAI. */
+    public function supportsBatch(): bool
     {
-        $payload = ['model' => $model, 'input' => $prompt];
-        if ($reasoning !== null) {
-            $payload['reasoning'] = ['effort' => $reasoning];
-        }
-        if ($webSearch) {
-            $payload['tools'] = [[
-                'type' => 'web_search',
-                'user_location' => ['type' => 'approximate', 'country' => 'ES', 'city' => 'Barcelona', 'timezone' => 'Europe/Madrid'],
-            ]];
-        }
-        if ($schema !== null) {
-            $payload['text'] = ['format' => ['type' => 'json_schema', 'name' => 'agenda_events', 'schema' => $schema, 'strict' => true]];
+        return $this->provider() === 'openai';
+    }
+
+    /**
+     * Recherche web libre (mode « web ») : le modèle cherche lui-même. Coûteux en tokens.
+     */
+    public function searchWeb(string $prompt): AiResult
+    {
+        if ($this->provider() === 'anthropic') {
+            return $this->anthropic($prompt, (string) config('services.anthropic.model'), webSearch: true);
         }
 
-        $response = Http::withToken((string) config('services.openai.key'))
-            ->timeout(160)
-            ->post('https://api.openai.com/v1/responses', $payload);
+        $model = (string) config('services.openai.model');
+        $body = ['model' => $model, 'input' => $prompt, 'tools' => [[
+            'type' => 'web_search',
+            'user_location' => ['type' => 'approximate', 'country' => 'ES', 'city' => 'Barcelona', 'timezone' => 'Europe/Madrid'],
+        ]]];
 
-        if ($response->failed()) {
-            throw new RuntimeException('API OpenAI : HTTP '.$response->status().' '.$response->json('error.message'));
+        return $this->parseOpenAiBody($this->postOpenAi($body), $model);
+    }
+
+    /**
+     * Extraction d'événements depuis un texte fourni (mode « sources ») : sans recherche web,
+     * avec le modèle économique, et un schéma JSON imposé quand le fournisseur le permet.
+     *
+     * @param  array<int, string>  $categories
+     */
+    public function extractEvents(string $prompt, array $categories): AiResult
+    {
+        if ($this->provider() === 'anthropic') {
+            return $this->anthropic($prompt, (string) config('services.anthropic.extract_model'));
         }
 
-        $content = collect($response->json('output', []))
+        $body = $this->extractionBody($prompt, $categories);
+
+        return $this->parseOpenAiBody($this->postOpenAi($body), $body['model']);
+    }
+
+    /**
+     * Corps de requête OpenAI /v1/responses pour l'extraction (aussi utilisé dans les lots Batch).
+     *
+     * @param  array<int, string>  $categories
+     * @return array<string, mixed>
+     */
+    public function extractionBody(string $prompt, array $categories): array
+    {
+        $body = [
+            'model' => (string) config('services.openai.extract_model'),
+            'input' => $prompt,
+            'text' => ['format' => ['type' => 'json_schema', 'name' => 'agenda_events', 'schema' => $this->eventsSchema($categories), 'strict' => true]],
+        ];
+        if ($reasoning = config('services.openai.extract_reasoning')) {
+            $body['reasoning'] = ['effort' => $reasoning];
+        }
+
+        return $body;
+    }
+
+    /**
+     * Lit une réponse OpenAI /v1/responses (appel direct ou ligne de résultat Batch).
+     *
+     * @param  array<string, mixed>  $body
+     */
+    public function parseOpenAiBody(array $body, string $model, bool $batch = false): AiResult
+    {
+        $content = collect($body['output'] ?? [])
             ->where('type', 'message')
             ->flatMap(fn (array $message) => $message['content'] ?? []);
 
@@ -85,10 +100,38 @@ class AiClient
             throw new RuntimeException('API OpenAI : refus du modèle ('.($refusal['refusal'] ?? '').')');
         }
 
-        return $content->where('type', 'output_text')->pluck('text')->implode('');
+        return new AiResult(
+            text: $content->where('type', 'output_text')->pluck('text')->implode(''),
+            model: (string) ($body['model'] ?? $model),
+            inputTokens: (int) ($body['usage']['input_tokens'] ?? 0),
+            outputTokens: (int) ($body['usage']['output_tokens'] ?? 0),
+            batch: $batch,
+        );
     }
 
-    private function anthropic(string $prompt, string $model, bool $webSearch = false): string
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function postOpenAi(array $body): array
+    {
+        $response = $this->openAiRequest()->timeout(160)->post('https://api.openai.com/v1/responses', $body);
+
+        if ($response->failed()) {
+            throw new RuntimeException('API OpenAI : HTTP '.$response->status().' '.$response->json('error.message'));
+        }
+
+        return $response->json();
+    }
+
+    /** Requête authentifiée vers OpenAI, avec réessais sur les erreurs passagères (429, 5xx, réseau). */
+    public function openAiRequest(): PendingRequest
+    {
+        return Http::withToken((string) config('services.openai.key'))
+            ->retry(3, fn (int $attempt) => $attempt * 5000, fn (\Throwable $e) => $this->isTransient($e), throw: false);
+    }
+
+    private function anthropic(string $prompt, string $model, bool $webSearch = false): AiResult
     {
         $payload = [
             'model' => $model,
@@ -99,19 +142,25 @@ class AiClient
             $payload['tools'] = [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 8]];
         }
 
+        /** @var Response $response */
         $response = Http::withHeaders([
             'x-api-key' => config('services.anthropic.key'),
             'anthropic-version' => '2023-06-01',
         ])
             ->timeout(160)
+            ->retry(3, fn (int $attempt) => $attempt * 5000, fn (\Throwable $e) => $this->isTransient($e), throw: false)
             ->post('https://api.anthropic.com/v1/messages', $payload);
 
         if ($response->failed()) {
             throw new RuntimeException('API Claude : HTTP '.$response->status().' '.$response->json('error.message'));
         }
 
-        return collect($response->json('content', []))
-            ->where('type', 'text')->pluck('text')->implode('');
+        return new AiResult(
+            text: collect($response->json('content', []))->where('type', 'text')->pluck('text')->implode(''),
+            model: (string) $response->json('model', $model),
+            inputTokens: (int) $response->json('usage.input_tokens', 0),
+            outputTokens: (int) $response->json('usage.output_tokens', 0),
+        );
     }
 
     /**

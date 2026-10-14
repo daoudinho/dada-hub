@@ -100,10 +100,14 @@ Vérifiez avec `php artisan schedule:list`.
 **5. À chaque déploiement**
 
 ```bash
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+php artisan migrate --force
+php artisan optimize
 php artisan horizon:terminate
 ```
 
-Horizon termine les jobs en cours puis s'arrête ; Supervisor le relance aussitôt avec le nouveau code.
+`optimize` met en cache la configuration, les routes (y compris celles des modules) et les vues. Après un changement de `.env` en production, relancez `php artisan optimize`. Horizon termine les jobs en cours puis s'arrête ; Supervisor le relance aussitôt avec le nouveau code.
 
 ### Commandes utiles
 
@@ -114,7 +118,8 @@ Horizon termine les jobs en cours puis s'arrête ; Supervisor le relance aussit�
 | `php artisan horizon:terminate` | Arrêt propre (relancé par Supervisor) |
 | `php artisan queue:failed` | Lister les jobs en échec |
 | `php artisan queue:retry all` | Relancer les jobs en échec |
-| `php artisan agenda:scan` | Lancer un scan à la main (`--filter=musique`, `--force`, `--web`) |
+| `php artisan agenda:scan` | Lancer un scan à la main (`--filter=musique`, `--force`, `--web`, `--batch`) |
+| `php artisan agenda:dedupe` | Fusionner les événements en double (`--dry-run` pour seulement les lister) |
 
 ### Dépannage
 

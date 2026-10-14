@@ -11,6 +11,7 @@ use ReflectionClass;
  * Base d'un sous-projet du hub.
  *
  * Chaque module vit dans app/Modules/{Nom}/ et peut contenir :
+ *  - config.php            : configuration, lue via config('{slug}.cle')
  *  - routes.php            : routes, montées sous /{slug}, nommées "{slug}.*", protégées par "auth"
  *  - views/                : vues Blade, appelées via view('{slug}::nom')
  *  - Database/Migrations/  : migrations, lancées par "php artisan migrate"
@@ -69,6 +70,13 @@ abstract class Module extends ServiceProvider
         $dir = dirname((new ReflectionClass($this))->getFileName());
 
         return $relative === '' ? $dir : $dir.DIRECTORY_SEPARATOR.$relative;
+    }
+
+    public function register(): void
+    {
+        if (is_file($this->path('config.php'))) {
+            $this->mergeConfigFrom($this->path('config.php'), $this->slug());
+        }
     }
 
     public function boot(): void

@@ -150,7 +150,10 @@ a.scan { display: inline-flex; align-items: center; text-decoration: none; }
       <label><input type="checkbox" name="filter" value="expos"> Expos (art, photo, manga)</label>
     </div>
     <div class="opts">
-      <label><input type="checkbox" id="mForce"> Ré-analyser aussi les pages inchangées</label>
+      <label><input type="checkbox" id="mForce"> Tout ré-analyser (même les sources récentes et les pages inchangées)</label>
+      @if (config('services.agenda.provider') === 'openai')
+        <label><input type="checkbox" id="mBatch"> Moitié prix via l'API Batch (résultats sous 24 h)</label>
+      @endif
       <label><input type="checkbox" id="mWeb"> Recherche web libre à la place des sources (plus coûteux)</label>
     </div>
     <div class="msg" id="scanMsg" aria-live="polite"></div>
@@ -307,8 +310,11 @@ $("mScan").addEventListener("click", async () => {
   $("mScan").disabled = true; $("scanBtn").disabled = true;
   $("scanMsg").textContent = "Lancement du scan…";
   try {
-    const scan = await api("scan", "POST", { filters, mode: $("mWeb").checked ? "web" : "sources", force: $("mForce").checked });
+    const scan = await api("scan", "POST", {
+      filters, mode: $("mWeb").checked ? "web" : "sources", force: $("mForce").checked, batch: !!($("mBatch") && $("mBatch").checked),
+    });
     if (scan.status === "failed") { finish("Le scan a échoué : " + (scan.error || "erreur inconnue")); return; }
+    if (scan.status === "done") { finish(summary(scan)); return; }
     progress(scan);
     poll(scan.id);
   } catch (err) {
@@ -323,8 +329,20 @@ function finish(msg) {
   $("mScan").disabled = false; $("scanBtn").disabled = false;
 }
 
+function summary(s) {
+  if (s.mode === "sources" && !s.sources_total && s.sources_skipped) {
+    return "Rien à analyser : les " + s.sources_skipped + " source(s) ont été scannées récemment. Coche « Tout ré-analyser » pour forcer.";
+  }
+  const cost = s.cost_usd != null ? " · ~" + Number(s.cost_usd).toFixed(4) + " $" : "";
+  return s.found + " événement(s) ajouté(s) ou mis à jour. " + s.ai_calls + " appel(s) IA, "
+    + (s.input_tokens + s.output_tokens).toLocaleString("fr-FR") + " tokens" + cost
+    + (s.mode === "sources" ? ", " + s.firecrawl_credits + " crédit(s) Firecrawl" : "") + ".";
+}
+
 function progress(s) {
-  if (s.status === "pending" && s.age > 15) {
+  if (s.status === "waiting") {
+    $("scanMsg").textContent = "Pages récupérées. Extraction envoyée à l'API Batch d'OpenAI : les événements arriveront d'ici quelques heures (24 h max). Tu peux fermer cette fenêtre.";
+  } else if (s.status === "pending" && s.age > 15) {
     $("scanMsg").textContent = "En attente… le worker de file d'attente tourne-t-il ? (php artisan queue:work)";
   } else if (s.mode === "sources" && s.sources_total) {
     $("scanMsg").textContent = "Analyse des sources : " + s.sources_done + " / " + s.sources_total + " · " + s.found + " événement(s) trouvé(s)";
@@ -340,7 +358,10 @@ function poll(id) {
       const s = await api("scan/" + id);
       if (s.status === "done") {
         await load();
-        finish(s.found + " événement(s) ajouté(s) ou mis à jour.");
+        finish(summary(s));
+      } else if (s.status === "waiting") {
+        progress(s);
+        finish($("scanMsg").textContent);
       } else if (s.status === "failed") {
         finish("Le scan a échoué : " + (s.error || "erreur inconnue"));
       } else {
