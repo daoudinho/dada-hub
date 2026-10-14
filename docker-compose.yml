@@ -1,0 +1,46 @@
+# Développement local.
+#
+#   docker compose up -d            → PostgreSQL seul (le site reste servi par WAMP)
+#   docker compose --profile app up -d --build
+#                                   → en plus, l'image de production sur http://localhost:8080
+#
+# Les identifiants ci-dessous ne servent qu'en local.
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dada_hub
+      POSTGRES_USER: dada
+      POSTGRES_PASSWORD: dada
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dada -d dada_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    profiles: ["app"]
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8080
+      DB_HOST: db
+      DB_PORT: 5432
+      LOG_CHANNEL: stderr
+
+volumes:
+  pgdata:

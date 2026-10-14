@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Bus;
 
 /**
- * Crée un scan et met ses jobs en file d'attente (un worker doit tourner : queue:work ou Horizon).
+ * Crée un scan et met ses jobs en file d'attente (un worker « php artisan queue:work » doit tourner).
  */
 class ScanLauncher
 {

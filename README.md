@@ -7,126 +7,82 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## Files d'attente et Horizon
+## Installation locale
 
-Les scans de l'Agenda tournent en tâche de fond (un job par source). Il faut donc toujours un worker qui traite la file d'attente.
+Prérequis : WAMP (PHP 8.3 avec les extensions `pdo_pgsql` et `pgsql` activées), Composer, Node.js et Docker Desktop.
 
-| | Local (WAMP, Windows) | Production (serveur Linux) |
-|---|---|---|
-| File d'attente | `database` | `redis` |
-| Worker | `php artisan queue:work` | Horizon |
-| Tableau de bord | aucun | `/horizon` |
+```bash
+git clone <url-du-depot> dada-hub && cd dada-hub
+composer install
+npm install && npm run build
+cp .env.example .env && php artisan key:generate
 
-> Horizon ne tourne pas sous Windows : il lui faut les extensions PHP `pcntl` et `posix`, et un serveur Redis. En local, n'ouvrez pas `/horizon` : sans Redis, la page plante.
+docker compose up -d          # PostgreSQL 17 sur le port 5432 (bases dada_hub et dada_hub_test)
+php artisan migrate
+php artisan db:seed --class="App\Modules\Agenda\Database\Seeders\AgendaSeeder"
+php artisan db:seed --class="App\Modules\Agenda\Database\Seeders\AgendaSourceSeeder"
+php artisan hub:user vous@exemple.fr
+```
 
-### En local
+Le site est servi par WAMP sur `http://localhost/dada-hub/public` (`APP_URL` dans `.env`). Renseignez aussi les clés `OPENAI_API_KEY` et `FIRECRAWL_API_KEY`.
 
-Gardez `QUEUE_CONNECTION=database` dans `.env` et laissez tourner, dans un terminal :
+**Tests** : `php artisan test` tourne sur SQLite en mémoire (rapide, sans Docker). Pour les lancer sur PostgreSQL, comme en production :
+
+```bash
+DB_CONNECTION=pgsql DB_DATABASE=dada_hub_test DB_USERNAME=dada DB_PASSWORD=dada php artisan test
+```
+
+**Image de production** : `docker compose --profile app up -d --build` lance l'image du `Dockerfile` (celle de Render) sur `http://localhost:8080`, avec Apache et le worker de file d'attente dans le même conteneur.
+
+## Files d'attente
+
+Les scans de l'Agenda tournent en tâche de fond (un job par source). Les jobs sont stockés dans la base de données (table `jobs`, `QUEUE_CONNECTION=database`) : il faut un worker qui les exécute.
 
 ```bash
 php artisan queue:work
 ```
 
-Après une modification du code d'un job, relancez la commande (le worker garde l'ancien code en mémoire).
+- En local, laissez cette commande tourner dans un terminal pendant que vous utilisez l'Agenda.
+- Après une modification du code d'un job, relancez-la : le worker garde l'ancien code en mémoire.
+- Sans worker, un scan reste « en attente » ; la page le signale au bout de 15 secondes.
 
-### En production
+### Planification
 
-**1. Prérequis**
+Les tâches planifiées sont dans `routes/console.php`, commentées pour l'instant (scan des sources chaque lundi à 6 h, via l'API Batch). Pour les activer, décommentez-les avec la ligne `use Illuminate\Support\Facades\Schedule;`, puis :
 
-- PHP avec les extensions `pcntl`, `posix` et `redis` (phpredis) ;
-- un serveur Redis accessible ;
-- Supervisor, pour garder Horizon en vie.
-
-**2. Variables `.env`**
-
-```dotenv
-QUEUE_CONNECTION=redis
-REDIS_CLIENT=phpredis
-REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
-REDIS_PORT=6379
-
-# Supérieur au timeout des jobs défini dans config/horizon.php (300 s)
-REDIS_QUEUE_RETRY_AFTER=330
-
-# Workers en parallèle : Firecrawl accepte 2 requêtes simultanées en offre gratuite, 5 en Hobby
-HORIZON_MAX_PROCESSES=2
-
-# Accès à /horizon : vide = tout utilisateur connecté du hub, sinon liste d'e-mails
-HORIZON_ADMINS=vous@exemple.fr
-```
-
-**3. Lancer Horizon avec Supervisor**
-
-Créez `/etc/supervisor/conf.d/horizon.conf` (adaptez le chemin et l'utilisateur) :
-
-```ini
-[program:horizon]
-process_name=%(program_name)s
-command=php /var/www/dada-hub/artisan horizon
-autostart=true
-autorestart=true
-user=www-data
-redirect_stderr=true
-stdout_logfile=/var/www/dada-hub/storage/logs/horizon.log
-stopwaitsecs=3600
-```
-
-Puis :
-
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start horizon
-```
-
-`stopwaitsecs` laisse aux jobs en cours le temps de se terminer quand Horizon s'arrête.
-
-**4. Activer la planification**
-
-Dans `routes/console.php`, décommentez la ligne `use Illuminate\Support\Facades\Schedule;` et les tâches :
-
-- `horizon:snapshot` : métriques des graphiques d'Horizon, toutes les 5 minutes ;
-- `agenda:scan` : scan des sources, chaque lundi à 6 h.
-
-Ajoutez ensuite la tâche cron qui exécute le planificateur chaque minute (`crontab -e -u www-data`) :
-
-```cron
-* * * * * cd /var/www/dada-hub && php artisan schedule:run >> /dev/null 2>&1
-```
+- en local : `php artisan schedule:work` ;
+- sur un serveur : une tâche cron qui exécute `php artisan schedule:run` chaque minute.
 
 Vérifiez avec `php artisan schedule:list`.
 
-**5. À chaque déploiement**
+### À chaque déploiement
 
 ```bash
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 php artisan migrate --force
 php artisan optimize
-php artisan horizon:terminate
+php artisan queue:restart
 ```
 
-`optimize` met en cache la configuration, les routes (y compris celles des modules) et les vues. Après un changement de `.env` en production, relancez `php artisan optimize`. Horizon termine les jobs en cours puis s'arrête ; Supervisor le relance aussitôt avec le nouveau code.
+`optimize` met en cache la configuration, les routes (y compris celles des modules) et les vues ; relancez-la après tout changement de `.env`. `queue:restart` demande au worker de se relancer avec le nouveau code une fois son job en cours terminé.
 
 ### Commandes utiles
 
 | Commande | Rôle |
 |---|---|
-| `php artisan horizon:status` | Horizon tourne-t-il ? |
-| `php artisan horizon:pause` / `horizon:continue` | Suspendre / reprendre le traitement des jobs |
-| `php artisan horizon:terminate` | Arrêt propre (relancé par Supervisor) |
+| `php artisan queue:work` | Exécuter les jobs en attente |
 | `php artisan queue:failed` | Lister les jobs en échec |
 | `php artisan queue:retry all` | Relancer les jobs en échec |
 | `php artisan agenda:scan` | Lancer un scan à la main (`--filter=musique`, `--force`, `--web`, `--batch`) |
 | `php artisan agenda:dedupe` | Fusionner les événements en double (`--dry-run` pour seulement les lister) |
+| `php artisan hub:user email@exemple.fr` | Créer un compte ou changer son mot de passe |
 
 ### Dépannage
 
-- **Scan bloqué « en attente »** : aucun worker ne tourne. Vérifiez `horizon:status` (production) ou lancez `queue:work` (local).
-- **Sources en échec « HTTP 429 »** : trop de requêtes simultanées vers Firecrawl. Baissez `HORIZON_MAX_PROCESSES`.
-- **Erreur 403 sur `/horizon`** : votre e-mail n'est pas dans `HORIZON_ADMINS`.
-- **`composer install` réclame `ext-pcntl` sous Windows** : ces extensions sont déclarées dans `config.platform` de `composer.json`. Ne retirez pas cette section.
+- **Scan bloqué « en attente »** : aucun worker ne tourne, lancez `php artisan queue:work`.
+- **Sources en échec « HTTP 429 »** : trop de requêtes simultanées vers Firecrawl (2 en offre gratuite). Ne lancez qu'un seul worker.
+- **Scan Batch « en attente du lot » depuis longtemps** : normal jusqu'à 24 h. Le worker doit tourner pour récupérer le résultat.
 
 ## About Laravel
 

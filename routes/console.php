@@ -20,9 +20,6 @@ Artisan::command('inspire', function () {
 |
 */
 
-// Horizon (production) : métriques des files pour les graphiques du tableau de bord.
-// Schedule::command('horizon:snapshot')->everyFiveMinutes();
-
 // Agenda : scan des sources chaque lundi à 6 h (heure de Barcelone), extraction via l'API Batch (moitié prix).
 // Schedule::command('agenda:scan --batch')
 //     ->weeklyOn(1, '06:00')
