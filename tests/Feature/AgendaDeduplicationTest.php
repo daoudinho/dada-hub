@@ -92,8 +92,8 @@ class AgendaDeduplicationTest extends TestCase
 
     public function test_dedupe_command_merges_existing_duplicates(): void
     {
-        Event::factory()->create(['title' => 'Aida', 'starts_on' => $this->date, 'source' => 'seed', 'dedupe_key' => 'old-1', 'url' => null]);
-        $complete = Event::factory()->create(['title' => 'Aida (Verdi)', 'starts_on' => $this->date, 'source' => 'scan', 'dedupe_key' => 'old-2', 'url' => 'https://liceu.test/aida', 'time' => '20:00']);
+        Event::factory()->create(['title' => 'Aida', 'starts_on' => $this->date, 'source' => 'seed', 'dedupe_key' => 'old-1', 'url' => null, 'time' => null, 'place' => null]);
+        $complete = Event::factory()->create(['title' => 'Aida (Verdi)', 'starts_on' => $this->date, 'source' => 'scan', 'dedupe_key' => 'old-2', 'url' => 'https://liceu.test/aida', 'time' => '20:00', 'place' => 'Liceu']);
 
         $this->artisan('agenda:dedupe')->expectsOutputToContain('1 doublon(s) fusionné(s), 1 événement(s) supprimé(s)')->assertSuccessful();
 
