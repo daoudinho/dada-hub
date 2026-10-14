@@ -18,6 +18,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Premier compte
+    |--------------------------------------------------------------------------
+    |
+    | Créé par « php artisan db:seed » s'il n'existe pas encore (jamais modifié
+    | ensuite). Pratique sur un hébergeur sans accès au terminal, comme Render.
+    |
+    */
+
+    'admin' => [
+        'email' => env('HUB_ADMIN_EMAIL'),
+        'password' => env('HUB_ADMIN_PASSWORD'),
+        'name' => env('HUB_ADMIN_NAME'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sous-projets du hub
     |--------------------------------------------------------------------------
     |

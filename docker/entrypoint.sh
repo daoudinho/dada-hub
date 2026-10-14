@@ -24,8 +24,9 @@ chmod -R ug+rwx storage bootstrap/cache
 ln -sf /dev/stdout /var/log/apache2/access.log
 ln -sf /dev/stderr /var/log/apache2/error.log
 
-artisan storage:link || true
 artisan migrate --force
+# Ne remplit que ce qui est vide (sources, événements de départ, premier compte) : voir DatabaseSeeder.
+artisan db:seed --force
 
 # Config, routes (y compris celles des modules) et vues en cache, avec les variables d'environnement du conteneur.
 artisan optimize
