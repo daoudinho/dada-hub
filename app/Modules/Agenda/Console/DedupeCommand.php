@@ -39,7 +39,12 @@ class DedupeCommand extends Command
             foreach ($groups as $key => $events) {
                 $keep = $events->sortByDesc(fn (Event $event) => $this->completeness($event))->first();
                 $deleted += Event::whereKey($events->reject(fn (Event $event) => $event->is($keep))->pluck('id'))->delete();
-                $keep->update(['dedupe_key' => $key]);
+                // Un doublon masqué ou mis en favori transmet ce choix à la version conservée.
+                $keep->update([
+                    'dedupe_key' => $key,
+                    'favorite' => $events->contains('favorite', true),
+                    'hidden_at' => $events->pluck('hidden_at')->filter()->min(),
+                ]);
             }
         });
 

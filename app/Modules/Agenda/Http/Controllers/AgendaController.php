@@ -24,10 +24,10 @@ class AgendaController extends Controller
         $today = now('Europe/Madrid')->toDateString();
 
         return response()->json(
-            Event::whereDate('starts_on', '>=', $today)
-                ->orWhereDate('ends_on', '>=', $today)
+            Event::whereNull('hidden_at')
+                ->where(fn ($query) => $query->whereDate('starts_on', '>=', $today)->orWhereDate('ends_on', '>=', $today))
                 ->orderBy('starts_on')->orderBy('time')
-                ->get(['id', 'title', 'starts_on', 'ends_on', 'time', 'place', 'url', 'category'])
+                ->get(['id', 'title', 'starts_on', 'ends_on', 'time', 'place', 'url', 'category', 'favorite'])
         );
     }
 
@@ -46,9 +46,33 @@ class AgendaController extends Controller
         return response()->json(Event::create($data + ['source' => 'manual']), 201);
     }
 
+    /**
+     * Met en favori ou ré-affiche un événement.
+     */
+    public function update(Request $r, Event $event): JsonResponse
+    {
+        $data = $r->validate([
+            'favorite' => 'sometimes|boolean',
+            'hidden' => 'sometimes|boolean',
+        ]);
+
+        if (array_key_exists('favorite', $data)) {
+            $event->favorite = $data['favorite'];
+        }
+        if (array_key_exists('hidden', $data)) {
+            $event->hidden_at = $data['hidden'] ? ($event->hidden_at ?? now()) : null;
+        }
+        $event->save();
+
+        return response()->json($event->only(['id', 'favorite']) + ['hidden' => $event->hidden_at !== null]);
+    }
+
+    /**
+     * Masque l'événement sans le supprimer : il reste connu du scan, qui ne le recrée donc pas.
+     */
     public function destroy(Event $event): JsonResponse
     {
-        $event->delete();
+        $event->update(['hidden_at' => now()]);
 
         return response()->json(['ok' => true]);
     }

@@ -14,9 +14,9 @@ class Event extends Model
 
     protected $table = 'agenda_events';
 
-    protected $fillable = ['title', 'starts_on', 'ends_on', 'time', 'place', 'url', 'category', 'source', 'source_id', 'dedupe_key'];
+    protected $fillable = ['title', 'starts_on', 'ends_on', 'time', 'place', 'url', 'category', 'favorite', 'hidden_at', 'source', 'source_id', 'dedupe_key'];
 
-    protected $casts = ['starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
+    protected $casts = ['starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d', 'favorite' => 'boolean', 'hidden_at' => 'datetime'];
 
     /** @return BelongsTo<Source, $this> */
     public function origin(): BelongsTo

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [AgendaController::class, 'index'])->name('index');
 Route::get('events', [AgendaController::class, 'events'])->name('events.index');
 Route::post('events', [AgendaController::class, 'store'])->name('events.store');
+Route::patch('events/{event}', [AgendaController::class, 'update'])->name('events.update');
 Route::delete('events/{event}', [AgendaController::class, 'destroy'])->name('events.destroy');
 Route::post('scan', [AgendaController::class, 'scan'])->middleware('throttle:4,10')->name('scan.store');
 Route::get('scan/{scan}', [AgendaController::class, 'scanStatus'])->name('scan.show');

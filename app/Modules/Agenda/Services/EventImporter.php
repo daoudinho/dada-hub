@@ -79,8 +79,8 @@ class EventImporter
 
             $event = $this->findExisting($title, $date) ?? new Event(['dedupe_key' => self::dedupeKey($title, $date)]);
 
-            if ($event->exists && $event->source === 'manual') {
-                $ids[] = $event->id; // saisi à la main : on ne l'écrase pas
+            if ($event->exists && ($event->source === 'manual' || $event->hidden_at !== null)) {
+                $ids[] = $event->id; // saisi à la main ou retiré par l'utilisateur : on n'y touche pas
 
                 continue;
             }
@@ -106,7 +106,7 @@ class EventImporter
 
     /**
      * Supprime les événements à venir d'une source qui ne figurent plus sur sa page
-     * (annulés, retirés). Les événements saisis à la main et ceux du jour ne sont jamais touchés.
+     * (annulés, retirés). Les événements saisis à la main, favoris ou du jour ne sont jamais touchés.
      *
      * @param  array<int, int>  $keptIds  événements trouvés lors de cette analyse
      * @return int nombre d'événements supprimés
@@ -115,6 +115,7 @@ class EventImporter
     {
         return Event::where('source_id', $source->id)
             ->where('source', 'scan')
+            ->where('favorite', false)
             ->whereDate('starts_on', '>', now('Europe/Madrid')->toDateString())
             ->whereDate('starts_on', '<=', $until)
             ->whereNotIn('id', $keptIds)

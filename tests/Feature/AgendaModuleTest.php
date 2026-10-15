@@ -47,7 +47,25 @@ class AgendaModuleTest extends TestCase
             ->assertJsonMissing(['id' => $past->id]);
 
         $this->deleteJson("/agenda/events/{$id}")->assertOk();
-        $this->assertDatabaseMissing('agenda_events', ['id' => $id]);
+        $this->assertNotNull(Event::find($id)->hidden_at);
+        $this->getJson('/agenda/events')->assertOk()->assertJsonMissing(['id' => $id]);
+
+        $this->patchJson("/agenda/events/{$id}", ['hidden' => false])->assertOk();
+        $this->getJson('/agenda/events')->assertOk()->assertJsonFragment(['id' => $id]);
+    }
+
+    public function test_event_can_be_marked_as_favorite(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $event = Event::factory()->create();
+
+        $this->patchJson("/agenda/events/{$event->id}", ['favorite' => true])
+            ->assertOk()
+            ->assertJson(['id' => $event->id, 'favorite' => true]);
+
+        $this->getJson('/agenda/events')->assertJsonFragment(['id' => $event->id, 'favorite' => true]);
+
+        $this->patchJson("/agenda/events/{$event->id}", ['favorite' => 'oui'])->assertUnprocessable();
     }
 
     public function test_web_scan_is_queued(): void

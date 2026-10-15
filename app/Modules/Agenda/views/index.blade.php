@@ -26,14 +26,16 @@ button.date { width: 100%; border: 0; text-align: left; font-family: inherit; cu
 @media (prefers-reduced-motion: reduce) { .date .chev { transition: none; } }
 .date .pill { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--datefg); color: var(--datebg); border-radius: 12px; padding: 4px 10px; }
 .blocks { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.ev { position: relative; display: block; text-decoration: none; background: var(--col, var(--c-fete)); color: var(--on-block); border-radius: 18px; padding: 12px 46px 12px 16px; min-width: 0; }
+.ev { position: relative; display: block; text-decoration: none; background: var(--col, var(--c-fete)); color: var(--on-block); border-radius: 18px; padding: 12px 82px 12px 16px; min-width: 0; }
 .ev:hover { filter: brightness(1.06); }
-.ev:focus-visible, .add:focus-visible, .x:focus-visible, button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.ev:focus-visible, .add:focus-visible, .x:focus-visible, .fav:focus-visible, button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 .ev h3 { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
 .ev p { margin: 3px 0 0; font-size: 14px; opacity: .92; line-height: 1.35; overflow-wrap: anywhere; }
 .ev .tag { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: .85; }
 .x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(0,0,0,.18); color: inherit; font-size: 18px; line-height: 1; cursor: pointer; font-family: var(--font); }
-.x:hover { background: rgba(0,0,0,.32); }
+.x:hover, .fav:hover { background: rgba(0,0,0,.32); }
+.fav { position: absolute; top: 8px; right: 44px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(0,0,0,.18); color: inherit; font-size: 16px; line-height: 1; cursor: pointer; font-family: var(--font); }
+.fav[aria-pressed="true"] { background: var(--on-block); color: var(--col, var(--c-fete)); }
 .nothing { background: var(--empty); color: var(--fg); border-radius: 18px; padding: 14px 16px; font-size: 17px; }
 :root[data-theme="light"] .nothing, :root:not([data-theme]) .nothing { color: var(--fg); }
 .none { text-align: center; color: var(--muted); padding: 28px 8px 8px; font-size: 15px; }
@@ -53,7 +55,8 @@ form input, form select { font: inherit; font-size: 16px; text-transform: none; 
 .foot { margin: 18px 8px 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 .foot a { color: inherit; }
 
-.top-actions { display: flex; gap: 8px; align-items: center; }
+.top-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.scan[aria-pressed="true"] { background: var(--chip); color: var(--chip-fg); border-color: var(--chip); }
 .scan { height: 40px; border: 1px solid var(--line); border-radius: 20px; background: transparent; color: var(--fg); font: inherit; font-weight: 600; font-size: 14px; padding: 0 16px; cursor: pointer; }
 .scan:disabled { opacity: .6; cursor: progress; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
@@ -90,6 +93,7 @@ a.scan { display: inline-flex; align-items: center; text-decoration: none; }
     <div><h1 id="title">Octobre</h1><small>Barcelone</small></div>
     <div class="top-actions">
       <a class="scan" href="{{ route('agenda.sources.index') }}">Sources</a>
+      <button class="scan" id="favBtn" type="button" aria-pressed="false">♥ Favoris</button>
       <button class="scan" id="scanBtn" type="button">Lancer Scan</button>
       <button class="add" id="addBtn" type="button" aria-label="Ajouter un événement" aria-expanded="false">+</button>
     </div>
@@ -171,7 +175,8 @@ const CATS = { fete: "Fête", cine: "Cinéma", musique: "Concert", scene: "Scèn
 const TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 const BASE = @json(route('agenda.index'));
 const $ = id => document.getElementById(id);
-let events = [], lastRemoved = null, toastTimer = null;
+let events = [], lastRemoved = null, toastTimer = null, favOnly = false;
+try { favOnly = localStorage.getItem("agenda-fav-only") === "1"; } catch (e) {}
 
 async function api(path, method = "GET", body) {
   const r = await fetch(BASE + "/" + path, {
@@ -200,13 +205,15 @@ function render() {
   const list = $("list"); list.textContent = "";
   const byDay = new Map();
   for (const ev of events) {
+    if (favOnly && !ev.favorite) continue;
     const start = ev.starts_on.slice(0, 10), end = (ev.ends_on || ev.starts_on).slice(0, 10);
     if (end < today) continue;
     const key = start < today ? today : start;
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key).push(ev);
   }
-  if (!byDay.has(today)) byDay.set(today, []);
+  if (favOnly && !byDay.size) { list.appendChild(el("div", "none", "Aucun favori à venir.")); return; }
+  if (!favOnly && !byDay.has(today)) byDay.set(today, []);
   let month = "";
   for (const key of [...byDay.keys()].sort()) {
     const date = parse(key), m = frMonth.format(date);
@@ -249,7 +256,10 @@ function block(ev, key) {
   b.appendChild(el("span", "tag", CATS[ev.category] || "Fête"));
   const x = el("button", "x", "×"); x.type = "button"; x.setAttribute("aria-label", "Retirer " + ev.title);
   x.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); remove(ev); });
-  b.appendChild(x);
+  const fav = el("button", "fav", ev.favorite ? "♥" : "♡"); fav.type = "button";
+  fav.setAttribute("aria-pressed", String(!!ev.favorite)); fav.setAttribute("aria-label", "Favori : " + ev.title);
+  fav.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(ev); });
+  b.append(fav, x);
   return b;
 }
 
@@ -265,10 +275,21 @@ async function undo() {
   if (!lastRemoved) return;
   const ev = lastRemoved; lastRemoved = null; $("toast").hidden = true;
   try {
-    await api("events", "POST", { title: ev.title, starts_on: ev.starts_on.slice(0, 10), ends_on: ev.ends_on ? ev.ends_on.slice(0, 10) : null, time: ev.time, place: ev.place, url: ev.url, category: ev.category });
+    await api("events/" + ev.id, "PATCH", { hidden: false });
     await load();
   } catch (e) {}
 }
+async function toggleFavorite(ev) {
+  ev.favorite = !ev.favorite; render();
+  try { await api("events/" + ev.id, "PATCH", { favorite: ev.favorite }); } catch (e) { ev.favorite = !ev.favorite; render(); toast("Erreur : " + e.message); }
+}
+function setFavOnly(on) {
+  favOnly = on; $("favBtn").setAttribute("aria-pressed", String(on));
+  try { localStorage.setItem("agenda-fav-only", on ? "1" : "0"); } catch (e) {}
+  render();
+}
+$("favBtn").addEventListener("click", () => setFavOnly(!favOnly));
+$("favBtn").setAttribute("aria-pressed", String(favOnly));
 function toast(msg) {
   $("toastMsg").textContent = msg; $("toast").hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; lastRemoved = null; }, 7000);

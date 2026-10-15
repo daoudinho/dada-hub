@@ -60,6 +60,18 @@ class AgendaDeduplicationTest extends TestCase
         $this->assertSame('Mon lieu', $manual->fresh()->place);
     }
 
+    public function test_hidden_event_stays_hidden_after_a_new_scan(): void
+    {
+        $hidden = Event::factory()->create(['title' => 'The Strokes', 'starts_on' => $this->date, 'source' => 'scan', 'hidden_at' => now()]);
+
+        $ids = $this->import([['title' => 'The Strokes – Live', 'place' => 'Palau Sant Jordi']]);
+
+        $this->assertSame([$hidden->id], $ids);
+        $this->assertDatabaseCount('agenda_events', 1);
+        $this->assertNotNull($hidden->fresh()->hidden_at);
+        $this->assertNotSame('Palau Sant Jordi', $hidden->fresh()->place);
+    }
+
     public function test_first_source_keeps_ownership(): void
     {
         [$razzmatazz, $apolo] = Source::factory()->count(2)->create();
@@ -80,6 +92,7 @@ class AgendaDeduplicationTest extends TestCase
         $otherEvent = Event::factory()->create(['source' => 'scan', 'source_id' => $other->id, 'starts_on' => $this->date]);
         $manual = Event::factory()->create(['source' => 'manual', 'starts_on' => $this->date]);
         $today = Event::factory()->create(['source' => 'scan', 'source_id' => $source->id, 'starts_on' => now('Europe/Madrid')->toDateString()]);
+        $favorite = Event::factory()->create(['source' => 'scan', 'source_id' => $source->id, 'starts_on' => $this->date, 'favorite' => true]);
 
         $deleted = $this->importer->prune($source, [$kept[0]], $until);
 
@@ -88,17 +101,19 @@ class AgendaDeduplicationTest extends TestCase
         $this->assertModelExists($otherEvent);
         $this->assertModelExists($manual);
         $this->assertModelExists($today);
+        $this->assertModelExists($favorite);
     }
 
     public function test_dedupe_command_merges_existing_duplicates(): void
     {
-        Event::factory()->create(['title' => 'Aida', 'starts_on' => $this->date, 'source' => 'seed', 'dedupe_key' => 'old-1', 'url' => null, 'time' => null, 'place' => null]);
+        Event::factory()->create(['title' => 'Aida', 'starts_on' => $this->date, 'source' => 'seed', 'dedupe_key' => 'old-1', 'url' => null, 'time' => null, 'place' => null, 'hidden_at' => now()]);
         $complete = Event::factory()->create(['title' => 'Aida (Verdi)', 'starts_on' => $this->date, 'source' => 'scan', 'dedupe_key' => 'old-2', 'url' => 'https://liceu.test/aida', 'time' => '20:00', 'place' => 'Liceu']);
 
         $this->artisan('agenda:dedupe')->expectsOutputToContain('1 doublon(s) fusionné(s), 1 événement(s) supprimé(s)')->assertSuccessful();
 
         $this->assertDatabaseCount('agenda_events', 1);
         $this->assertSame(EventImporter::dedupeKey('Aida', $this->date), $complete->fresh()->dedupe_key);
+        $this->assertNotNull($complete->fresh()->hidden_at);
     }
 
     /**
