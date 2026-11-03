@@ -81,7 +81,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_scan_job_stores_valid_events_from_openai(): void
     {
-        config(['services.agenda.provider' => 'openai']);
+        config(['ai.provider' => 'openai']);
         Http::fake(['api.openai.com/*' => Http::response(['output' => [
             ['type' => 'web_search_call', 'id' => 'ws_1', 'status' => 'completed'],
             ['type' => 'message', 'role' => 'assistant', 'content' => [['type' => 'output_text', 'text' => "Voici :\n".$this->aiEventsJson()]]],
@@ -100,7 +100,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_scan_job_stores_valid_events_from_anthropic(): void
     {
-        config(['services.agenda.provider' => 'anthropic']);
+        config(['ai.provider' => 'anthropic']);
         Http::fake(['api.anthropic.com/*' => Http::response(['content' => [['type' => 'text', 'text' => "Voici :\n".$this->aiEventsJson()]]])]);
 
         $scan = Scan::create(['filters' => ['musique']]);
@@ -113,7 +113,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_scan_job_marks_scan_failed_on_api_error(): void
     {
-        config(['services.agenda.provider' => 'openai']);
+        config(['ai.provider' => 'openai']);
         Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'Incorrect API key provided']], 401)]);
 
         $scan = Scan::create(['filters' => ['musique']]);

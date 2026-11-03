@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Modules\Agenda\Services;
+namespace App\Services\Ai;
 
+use App\Services\RetriesTransientErrors;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Appels à l'IA choisie par AGENDA_AI_PROVIDER (openai ou anthropic).
+ * Appels à l'IA choisie par AI_PROVIDER (openai ou anthropic), partagés par les modules du hub.
  */
 class AiClient
 {
@@ -16,7 +17,7 @@ class AiClient
 
     public function provider(): string
     {
-        $provider = config('services.agenda.provider');
+        $provider = config('ai.provider');
         if (! in_array($provider, ['openai', 'anthropic'], true)) {
             throw new RuntimeException('Fournisseur IA inconnu : '.$provider);
         }
@@ -31,52 +32,54 @@ class AiClient
     }
 
     /**
-     * Recherche web libre (mode « web ») : le modèle cherche lui-même. Coûteux en tokens.
+     * Recherche web libre : le modèle cherche lui-même. Coûteux en tokens.
+     *
+     * @param  array<string, string>|null  $userLocation  position approximative (OpenAI : type, country, city, timezone)
      */
-    public function searchWeb(string $prompt): AiResult
+    public function searchWeb(string $prompt, ?array $userLocation = null): AiResult
     {
         if ($this->provider() === 'anthropic') {
             return $this->anthropic($prompt, (string) config('services.anthropic.model'), webSearch: true);
         }
 
         $model = (string) config('services.openai.model');
-        $body = ['model' => $model, 'input' => $prompt, 'tools' => [[
-            'type' => 'web_search',
-            'user_location' => ['type' => 'approximate', 'country' => 'ES', 'city' => 'Barcelona', 'timezone' => 'Europe/Madrid'],
-        ]]];
+        $tool = ['type' => 'web_search'] + ($userLocation ? ['user_location' => $userLocation] : []);
 
-        return $this->parseOpenAiBody($this->postOpenAi($body), $model);
+        return $this->parseOpenAiBody($this->postOpenAi(['model' => $model, 'input' => $prompt, 'tools' => [$tool]]), $model);
     }
 
     /**
-     * Extraction d'événements depuis un texte fourni (mode « sources ») : sans recherche web,
-     * avec le modèle économique, et un schéma JSON imposé quand le fournisseur le permet.
+     * Extraction de données depuis un texte fourni : sans recherche web, avec le modèle économique,
+     * et le schéma JSON imposé (OpenAI) ou ajouté à la fin du prompt (Claude).
      *
-     * @param  array<int, string>  $categories
+     * @param  string  $schemaName  nom court du schéma ([a-z_])
+     * @param  array<string, mixed>  $schema  schéma JSON strict de l'objet attendu
      */
-    public function extractEvents(string $prompt, array $categories): AiResult
+    public function extract(string $prompt, string $schemaName, array $schema): AiResult
     {
         if ($this->provider() === 'anthropic') {
+            $prompt .= "\n\nRéponds uniquement par un objet JSON conforme à ce schéma :\n".json_encode($schema, JSON_UNESCAPED_UNICODE);
+
             return $this->anthropic($prompt, (string) config('services.anthropic.extract_model'));
         }
 
-        $body = $this->extractionBody($prompt, $categories);
+        $body = $this->extractionBody($prompt, $schemaName, $schema);
 
         return $this->parseOpenAiBody($this->postOpenAi($body), $body['model']);
     }
 
     /**
-     * Corps de requête OpenAI /v1/responses pour l'extraction (aussi utilisé dans les lots Batch).
+     * Corps de requête OpenAI /v1/responses pour une extraction (aussi utilisé dans les lots Batch).
      *
-     * @param  array<int, string>  $categories
+     * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
-    public function extractionBody(string $prompt, array $categories): array
+    public function extractionBody(string $prompt, string $schemaName, array $schema): array
     {
         $body = [
             'model' => (string) config('services.openai.extract_model'),
             'input' => $prompt,
-            'text' => ['format' => ['type' => 'json_schema', 'name' => 'agenda_events', 'schema' => $this->eventsSchema($categories), 'strict' => true]],
+            'text' => ['format' => ['type' => 'json_schema', 'name' => $schemaName, 'schema' => $schema, 'strict' => true]],
         ];
         if ($reasoning = config('services.openai.extract_reasoning')) {
             $body['reasoning'] = ['effort' => $reasoning];
@@ -109,6 +112,13 @@ class AiClient
         );
     }
 
+    /** Requête authentifiée vers OpenAI, avec réessais sur les erreurs passagères (429, 5xx, réseau). */
+    public function openAiRequest(): PendingRequest
+    {
+        return Http::withToken((string) config('services.openai.key'))
+            ->retry(3, fn (int $attempt) => $attempt * 5000, fn (\Throwable $e) => $this->isTransient($e), throw: false);
+    }
+
     /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
@@ -122,13 +132,6 @@ class AiClient
         }
 
         return $response->json();
-    }
-
-    /** Requête authentifiée vers OpenAI, avec réessais sur les erreurs passagères (429, 5xx, réseau). */
-    public function openAiRequest(): PendingRequest
-    {
-        return Http::withToken((string) config('services.openai.key'))
-            ->retry(3, fn (int $attempt) => $attempt * 5000, fn (\Throwable $e) => $this->isTransient($e), throw: false);
     }
 
     private function anthropic(string $prompt, string $model, bool $webSearch = false): AiResult
@@ -161,41 +164,5 @@ class AiClient
             inputTokens: (int) $response->json('usage.input_tokens', 0),
             outputTokens: (int) $response->json('usage.output_tokens', 0),
         );
-    }
-
-    /**
-     * Schéma strict : {"events": [{title, start, end, time, place, url, category}]}.
-     *
-     * @param  array<int, string>  $categories
-     * @return array<string, mixed>
-     */
-    private function eventsSchema(array $categories): array
-    {
-        $nullableString = ['type' => ['string', 'null']];
-
-        return [
-            'type' => 'object',
-            'additionalProperties' => false,
-            'required' => ['events'],
-            'properties' => [
-                'events' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'additionalProperties' => false,
-                        'required' => ['title', 'start', 'end', 'time', 'place', 'url', 'category'],
-                        'properties' => [
-                            'title' => ['type' => 'string'],
-                            'start' => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
-                            'end' => $nullableString + ['description' => 'YYYY-MM-DD'],
-                            'time' => $nullableString + ['description' => 'HH:MM'],
-                            'place' => $nullableString,
-                            'url' => $nullableString,
-                            'category' => ['type' => 'string', 'enum' => array_values($categories)],
-                        ],
-                    ],
-                ],
-            ],
-        ];
     }
 }

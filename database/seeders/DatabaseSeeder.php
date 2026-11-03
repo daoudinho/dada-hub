@@ -7,6 +7,8 @@ use App\Modules\Agenda\Database\Seeders\AgendaSeeder;
 use App\Modules\Agenda\Database\Seeders\AgendaSourceSeeder;
 use App\Modules\Agenda\Models\Event;
 use App\Modules\Agenda\Models\Source;
+use App\Modules\Recettes\Database\Seeders\RecipeTagSeeder;
+use App\Modules\Recettes\Models\Tag;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -24,6 +26,10 @@ class DatabaseSeeder extends Seeder
 
         if (Event::query()->doesntExist()) {
             $this->call(AgendaSeeder::class);
+        }
+
+        if (Tag::query()->doesntExist()) {
+            $this->call(RecipeTagSeeder::class);
         }
 
         $this->createAdmin();

@@ -37,12 +37,18 @@ WORKDIR /var/www/html
 
 RUN apt-get update && apt-get install -y \
     libicu-dev \
+    libjpeg62-turbo-dev \
     libonig-dev \
+    libpng-dev \
     libpq-dev \
+    libwebp-dev \
     libzip-dev \
     unzip \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install \
     bcmath \
+    exif \
+    gd \
     intl \
     mbstring \
     pcntl \
@@ -58,6 +64,8 @@ RUN { \
     echo "memory_limit=256M"; \
     echo "max_execution_time=120"; \
     echo "max_input_time=120"; \
+    echo "upload_max_filesize=12M"; \
+    echo "post_max_size=14M"; \
     } > /usr/local/etc/php/conf.d/app.ini
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public

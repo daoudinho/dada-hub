@@ -155,7 +155,7 @@ a.scan { display: inline-flex; align-items: center; text-decoration: none; }
     </div>
     <div class="opts">
       <label><input type="checkbox" id="mForce"> Tout ré-analyser (même les sources récentes et les pages inchangées)</label>
-      @if (config('services.agenda.provider') === 'openai')
+      @if (config('ai.provider') === 'openai')
         <label><input type="checkbox" id="mBatch"> Moitié prix via l'API Batch (résultats sous 24 h)</label>
       @endif
       <label><input type="checkbox" id="mWeb"> Recherche web libre à la place des sources (plus coûteux)</label>

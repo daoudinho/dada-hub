@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Agenda\Services;
+namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;

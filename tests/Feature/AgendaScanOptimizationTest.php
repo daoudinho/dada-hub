@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Modules\Agenda\Jobs\ScanSourceJob;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
-use App\Modules\Agenda\Services\FirecrawlClient;
+use App\Modules\Agenda\Services\PageFingerprint;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,11 +28,11 @@ class AgendaScanOptimizationTest extends TestCase
 
         Sleep::fake();
         config([
-            'services.agenda.provider' => 'openai',
+            'ai.provider' => 'openai',
             'services.openai.key' => 'sk-test',
             'services.openai.extract_model' => 'gpt-5-nano',
             'services.firecrawl.key' => 'fc-test',
-            'agenda.prices.gpt-5-nano' => [0.05, 0.40],
+            'ai.prices.gpt-5-nano' => [0.05, 0.40],
         ]);
     }
 
@@ -69,16 +69,16 @@ class AgendaScanOptimizationTest extends TestCase
 
     public function test_fingerprint_ignores_changes_outside_event_dates(): void
     {
-        $firecrawl = app(FirecrawlClient::class);
+        $fingerprints = app(PageFingerprint::class);
         $page = "## Programme\n\nThe Strokes\n20 octobre 2026 · 21:00\n\nBand of Horses\n21/10/2026\n\nTeenage Fanclub\n17 oct.";
 
         $this->assertSame(
-            $firecrawl->fingerprint("Mis à jour il y a 5 minutes · 1 204 visiteurs\n\n".$page."\n\n[Billets](https://x.test/?session=abc)"),
-            $firecrawl->fingerprint("Mis à jour il y a 2 minutes · 1 377 visiteurs\n\n".$page."\n\n[Billets](https://x.test/?session=xyz)"),
+            $fingerprints->of("Mis à jour il y a 5 minutes · 1 204 visiteurs\n\n".$page."\n\n[Billets](https://x.test/?session=abc)"),
+            $fingerprints->of("Mis à jour il y a 2 minutes · 1 377 visiteurs\n\n".$page."\n\n[Billets](https://x.test/?session=xyz)"),
         );
         $this->assertNotSame(
-            $firecrawl->fingerprint($page),
-            $firecrawl->fingerprint(str_replace('Band of Horses', 'Fontaines D.C.', $page)),
+            $fingerprints->of($page),
+            $fingerprints->of(str_replace('Band of Horses', 'Fontaines D.C.', $page)),
         );
     }
 

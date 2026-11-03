@@ -5,9 +5,9 @@ namespace App\Modules\Agenda\Jobs;
 use App\Modules\Agenda\Categories;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
-use App\Modules\Agenda\Services\AiClient;
 use App\Modules\Agenda\Services\EventImporter;
 use App\Modules\Agenda\Services\Prompts;
+use App\Services\Ai\AiClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +36,10 @@ class ScanEventsJob implements ShouldQueue
             $categories = Categories::forFilters($scan->filters);
             $sources = Source::scannableFor($categories)->orderBy('name')->get();
 
-            $result = $ai->searchWeb($prompts->forWebSearch($scan->filters, $categories, $sources));
+            $result = $ai->searchWeb(
+                $prompts->forWebSearch($scan->filters, $categories, $sources),
+                ['type' => 'approximate', 'country' => 'ES', 'city' => 'Barcelona', 'timezone' => 'Europe/Madrid'],
+            );
             Scan::addUsage($scan->id, $result);
             $found = count($importer->import($importer->parse($result->text), $categories));
             $scan->update(['status' => 'done', 'found' => $found]);

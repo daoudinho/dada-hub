@@ -35,10 +35,6 @@ return [
         ],
     ],
 
-    'agenda' => [
-        'provider' => env('AGENDA_AI_PROVIDER', 'openai'), // openai ou anthropic
-    ],
-
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-5.5'), // recherche web libre

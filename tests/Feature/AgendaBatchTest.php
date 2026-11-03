@@ -22,12 +22,12 @@ class AgendaBatchTest extends TestCase
         parent::setUp();
 
         config([
-            'services.agenda.provider' => 'openai',
+            'ai.provider' => 'openai',
             'services.openai.key' => 'sk-test',
             'services.openai.extract_model' => 'gpt-5-nano',
             'services.firecrawl.key' => 'fc-test',
-            'agenda.prices.gpt-5-nano' => [0.05, 0.40],
-            'agenda.batch_price_factor' => 0.5,
+            'ai.prices.gpt-5-nano' => [0.05, 0.40],
+            'ai.batch_price_factor' => 0.5,
         ]);
     }
 

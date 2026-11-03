@@ -4,8 +4,8 @@ namespace App\Modules\Agenda\Jobs;
 
 use App\Modules\Agenda\Models\AiRequest;
 use App\Modules\Agenda\Models\Scan;
-use App\Modules\Agenda\Services\AiClient;
 use App\Modules\Agenda\Services\SourceExtraction;
+use App\Services\Ai\AiClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
