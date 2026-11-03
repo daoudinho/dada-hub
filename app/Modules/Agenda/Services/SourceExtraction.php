@@ -4,6 +4,7 @@ namespace App\Modules\Agenda\Services;
 
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
+use App\Services\Ai\AiResult;
 
 /**
  * Applique le résultat d'une extraction IA à une source : import des événements,

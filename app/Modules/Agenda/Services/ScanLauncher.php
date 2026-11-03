@@ -8,6 +8,7 @@ use App\Modules\Agenda\Jobs\ScanSourceJob;
 use App\Modules\Agenda\Jobs\SubmitAiBatchJob;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
+use App\Services\Ai\AiClient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Bus;
 

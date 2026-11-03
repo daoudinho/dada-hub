@@ -5,10 +5,12 @@ namespace App\Modules\Agenda\Jobs;
 use App\Modules\Agenda\Models\AiRequest;
 use App\Modules\Agenda\Models\Scan;
 use App\Modules\Agenda\Models\Source;
-use App\Modules\Agenda\Services\AiClient;
-use App\Modules\Agenda\Services\FirecrawlClient;
+use App\Modules\Agenda\Services\EventSchema;
+use App\Modules\Agenda\Services\PageFingerprint;
 use App\Modules\Agenda\Services\Prompts;
 use App\Modules\Agenda\Services\SourceExtraction;
+use App\Services\Ai\AiClient;
+use App\Services\Firecrawl\FirecrawlClient;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -40,7 +42,7 @@ class ScanSourceJob implements ShouldQueue
         public bool $batchAi = false,
     ) {}
 
-    public function handle(FirecrawlClient $firecrawl, AiClient $ai, Prompts $prompts, SourceExtraction $extraction): void
+    public function handle(FirecrawlClient $firecrawl, AiClient $ai, Prompts $prompts, SourceExtraction $extraction, PageFingerprint $fingerprints): void
     {
         if ($this->batch()?->cancelled()) {
             return;
@@ -55,10 +57,11 @@ class ScanSourceJob implements ShouldQueue
                 return;
             }
 
-            $page = $firecrawl->scrape($source->url);
+            $page = $firecrawl->scrape($source->url, country: 'ES');
+            $fingerprint = $fingerprints->of($page->markdown);
             Scan::addUsage($this->scanId, firecrawlCredits: $page->credits);
 
-            if (! $this->force && $source->content_hash === $page->fingerprint) {
+            if (! $this->force && $source->content_hash === $fingerprint) {
                 $source->markScanned('unchanged');
 
                 return;
@@ -70,7 +73,7 @@ class ScanSourceJob implements ShouldQueue
                 AiRequest::create([
                     'scan_id' => $this->scanId,
                     'source_id' => $source->id,
-                    'content_hash' => $page->fingerprint,
+                    'content_hash' => $fingerprint,
                     'categories' => $this->categories,
                     'prompt' => $prompt,
                 ]);
@@ -79,7 +82,7 @@ class ScanSourceJob implements ShouldQueue
                 return;
             }
 
-            $found = $extraction->apply($this->scanId, $source, $page->fingerprint, $this->categories, $ai->extractEvents($prompt, $this->categories));
+            $found = $extraction->apply($this->scanId, $source, $fingerprint, $this->categories, $ai->extract($prompt, EventSchema::NAME, EventSchema::for($this->categories)));
         } catch (\Throwable $e) {
             Log::warning('Scan agenda : source en échec', ['source' => $this->sourceId, 'error' => $e->getMessage()]);
             $source?->markFailed($e->getMessage());

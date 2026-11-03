@@ -2,7 +2,7 @@
 
 namespace App\Modules\Agenda\Models;
 
-use App\Modules\Agenda\Services\AiResult;
+use App\Services\Ai\AiResult;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 

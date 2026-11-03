@@ -4,7 +4,8 @@ namespace App\Modules\Agenda\Jobs;
 
 use App\Modules\Agenda\Models\AiRequest;
 use App\Modules\Agenda\Models\Scan;
-use App\Modules\Agenda\Services\AiClient;
+use App\Modules\Agenda\Services\EventSchema;
+use App\Services\Ai\AiClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,7 +46,7 @@ class SubmitAiBatchJob implements ShouldQueue
                 'custom_id' => $request->customId(),
                 'method' => 'POST',
                 'url' => '/v1/responses',
-                'body' => $ai->extractionBody($request->prompt, $request->categories),
+                'body' => $ai->extractionBody($request->prompt, EventSchema::NAME, EventSchema::for($request->categories)),
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))->implode("\n");
 
             $file = $ai->openAiRequest()->timeout(120)
