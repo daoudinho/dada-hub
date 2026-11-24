@@ -12,7 +12,7 @@ use ReflectionClass;
  *
  * Chaque module vit dans app/Modules/{Nom}/ et peut contenir :
  *  - config.php            : configuration, lue via config('{slug}.cle')
- *  - routes.php            : routes, montées sous /{slug}, nommées "{slug}.*", protégées par "auth"
+ *  - routes.php            : routes, montées sous /{slug}, nommées "{slug}.*", réservées aux comptes qui ont accès au module
  *  - views/                : vues Blade, appelées via view('{slug}::nom')
  *  - Database/Migrations/  : migrations, lancées par "php artisan migrate"
  */
@@ -37,13 +37,23 @@ abstract class Module extends ServiceProvider
     }
 
     /**
-     * Middlewares appliqués à toutes les routes du module.
+     * Middlewares appliqués à toutes les routes du module : connexion, puis accès ouvert par l'administrateur.
      *
      * @return array<int, string>
      */
     public function middleware(): array
     {
-        return ['web', 'auth'];
+        return ['web', 'auth', 'module:'.$this->slug()];
+    }
+
+    /**
+     * Sous-modules que l'administrateur ouvre compte par compte (clé => libellé). Aucun par défaut.
+     *
+     * @return array<string, string>
+     */
+    public function features(): array
+    {
+        return [];
     }
 
     /** Route d'entrée du module (lien de la tuile). */

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 
-#[Signature('hub:user {email? : Adresse e-mail} {--name= : Nom affiché} {--password= : Mot de passe (demandé si absent)}')]
+#[Signature('hub:user {email? : Adresse e-mail} {--name= : Nom affiché} {--password= : Mot de passe (demandé si absent)} {--admin : Donne le rôle administrateur}')]
 #[Description('Crée un compte utilisateur du hub, ou change le mot de passe d\'un compte existant')]
 class CreateUser extends Command
 {
@@ -36,7 +36,11 @@ class CreateUser extends Command
 
         $user = User::firstOrNew(['email' => $email]);
         $isNew = ! $user->exists;
-        $user->forceFill(['name' => $name, 'password' => Hash::make($password), 'email_verified_at' => $user->email_verified_at ?? now()])->save();
+        $user->forceFill(['name' => $name, 'password' => Hash::make($password), 'email_verified_at' => $user->email_verified_at ?? now()]);
+        if ($this->option('admin')) {
+            $user->forceFill(['role' => User::ROLE_ADMIN]);
+        }
+        $user->save();
 
         $this->info(($isNew ? 'Compte créé' : 'Compte mis à jour').' : '.$user->email);
 

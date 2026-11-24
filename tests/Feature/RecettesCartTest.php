@@ -17,7 +17,7 @@ class RecettesCartTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('recettes')->create());
     }
 
     public function test_recipe_is_added_with_its_servings_then_updated_and_removed(): void

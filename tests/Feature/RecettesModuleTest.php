@@ -18,7 +18,7 @@ class RecettesModuleTest extends TestCase
     {
         parent::setUp();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('recettes')->create());
     }
 
     public function test_pages_require_authentication(): void

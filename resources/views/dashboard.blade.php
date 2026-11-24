@@ -15,15 +15,11 @@
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($modules as $module)
                         <a href="{{ route($module->entryRoute()) }}"
-                           class="group block bg-white shadow-sm sm:rounded-lg p-6 border border-transparent hover:border-indigo-300 hover:shadow-md transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                           class="group block bg-white shadow-sm sm:rounded-lg p-6 text-center border border-transparent hover:border-indigo-300 hover:shadow-md transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                             <div class="text-4xl" aria-hidden="true">{{ $module->icon() }}</div>
                             <h3 class="mt-4 text-lg font-semibold text-gray-900 group-hover:text-indigo-600">
                                 {{ $module->name() }}
                             </h3>
-                            @if ($module->description())
-                                <p class="mt-2 text-sm text-gray-600">{{ $module->description() }}</p>
-                            @endif
-                            <p class="mt-4 text-xs font-mono text-gray-400">/{{ $module->slug() }}</p>
                         </a>
                     @endforeach
                 </div>

@@ -49,6 +49,14 @@ return [
         'extract_model' => env('ANTHROPIC_EXTRACT_MODEL', 'claude-haiku-5-5'),
     ],
 
+    // Application Strava du coach (strava.com/settings/api) : connexion des comptes et webhook des nouvelles activités.
+    'strava' => [
+        'client_id' => env('STRAVA_CLIENT_ID'),
+        'client_secret' => env('STRAVA_CLIENT_SECRET'),
+        'webhook_verify_token' => env('STRAVA_WEBHOOK_VERIFY_TOKEN'), // chaîne au choix, renvoyée par Strava à l'abonnement
+        'subscription_id' => env('STRAVA_SUBSCRIPTION_ID'), // donné par « php artisan coach:strava-webhook --create »
+    ],
+
     'firecrawl' => [
         'key' => env('FIRECRAWL_API_KEY'),
         'max_age' => (int) env('FIRECRAWL_MAX_AGE', 3600000), // ms : copie en cache Firecrawl acceptée (1 h)

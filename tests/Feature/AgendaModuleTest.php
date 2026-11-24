@@ -23,7 +23,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_agenda_page_renders_for_authenticated_user(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->get('/agenda')
             ->assertOk()
             ->assertSee('Lancer Scan')
@@ -32,7 +32,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_events_can_be_listed_created_and_deleted(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('agenda')->create());
         $past = Event::factory()->create(['starts_on' => now()->subDays(10)->toDateString()]);
 
         $id = $this->postJson('/agenda/events', [
@@ -56,7 +56,7 @@ class AgendaModuleTest extends TestCase
 
     public function test_event_can_be_marked_as_favorite(): void
     {
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('agenda')->create());
         $event = Event::factory()->create();
 
         $this->patchJson("/agenda/events/{$event->id}", ['favorite' => true])
@@ -71,7 +71,7 @@ class AgendaModuleTest extends TestCase
     public function test_web_scan_is_queued(): void
     {
         Bus::fake();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('agenda')->create());
 
         $this->postJson('/agenda/scan', ['filters' => ['musique'], 'mode' => 'web'])->assertAccepted();
 
