@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Agenda\AgendaModule;
+use App\Modules\Coach\CoachModule;
 use App\Modules\Recettes\RecettesModule;
 
 return [
@@ -46,6 +47,7 @@ return [
     'modules' => [
         AgendaModule::class,
         RecettesModule::class,
+        CoachModule::class,
     ],
 
 ];

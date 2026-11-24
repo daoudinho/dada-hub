@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureModuleAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Render (et la plupart des hébergeurs) termine le HTTPS sur un proxy devant l'application.
         $middleware->trustProxies(at: '*');
+
+        // Accès d'un compte à un module du hub (ouvert par l'administrateur) : « module:{slug} ».
+        $middleware->alias(['module' => EnsureModuleAccess::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

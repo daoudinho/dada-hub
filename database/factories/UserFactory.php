@@ -42,4 +42,32 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /** Administrateur : accès à tous les modules et à la gestion des comptes. */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => User::ROLE_ADMIN,
+        ]);
+    }
+
+    /**
+     * Membre à qui ces modules sont ouverts.
+     *
+     * @param  string|list<string>  $slugs
+     */
+    public function withModules(string|array $slugs): static
+    {
+        return $this->afterCreating(fn (User $user) => $user->syncModules((array) $slugs));
+    }
+
+    /**
+     * Sous-modules ouverts (par exemple ['coach' => ['running']]).
+     *
+     * @param  array<string, list<string>>  $features
+     */
+    public function withFeatures(array $features): static
+    {
+        return $this->afterCreating(fn (User $user) => $user->syncModuleFeatures($features));
+    }
 }

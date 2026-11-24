@@ -39,7 +39,7 @@ class AgendaSourceScanTest extends TestCase
         Source::factory()->create(['category' => 'expo']);
         Source::factory()->inactive()->create(['category' => 'musique']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->postJson('/agenda/scan', ['filters' => ['musique']])
             ->assertAccepted()
             ->assertJson(['mode' => 'sources', 'status' => 'pending', 'sources_total' => 2]);
@@ -53,7 +53,7 @@ class AgendaSourceScanTest extends TestCase
         Bus::fake();
         Source::factory()->inactive()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->postJson('/agenda/scan', ['filters' => ['musique']])
             ->assertJson(['status' => 'failed', 'error' => 'Aucune source active pour ces catégories.']);
 
@@ -141,7 +141,7 @@ class AgendaSourceScanTest extends TestCase
         $this->fakeApis('Concert le 20 octobre');
         Source::factory()->count(2)->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->postJson('/agenda/scan', ['filters' => ['musique']])
             ->assertAccepted();
 

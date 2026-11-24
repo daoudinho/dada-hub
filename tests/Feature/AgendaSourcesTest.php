@@ -21,7 +21,7 @@ class AgendaSourcesTest extends TestCase
         Source::factory()->create(['name' => 'Sala Apolo']);
         Source::factory()->inactive()->create(['name' => 'Sónar']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->get('/agenda/sources')
             ->assertOk()
             ->assertSeeInOrder(['Sala Apolo', 'Sónar'])
@@ -30,7 +30,7 @@ class AgendaSourcesTest extends TestCase
 
     public function test_source_can_be_added(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->post('/agenda/sources', ['name' => 'Jamboree', 'url' => 'https://www.jamboreebarcelona.com/en/', 'category' => 'musique'])
             ->assertRedirect(route('agenda.sources.index'));
 
@@ -41,7 +41,7 @@ class AgendaSourcesTest extends TestCase
     {
         $existing = Source::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->post('/agenda/sources', ['name' => 'Doublon', 'url' => $existing->url])
             ->assertSessionHasErrorsIn('create', 'url');
 
@@ -54,7 +54,7 @@ class AgendaSourcesTest extends TestCase
     public function test_source_can_be_toggled(): void
     {
         $source = Source::factory()->create();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withModules('agenda')->create());
 
         $this->patch("/agenda/sources/{$source->id}", ['active' => 0])->assertSessionHas('status', '« '.$source->name.' » désactivée.');
         $this->assertFalse($source->fresh()->active);
@@ -67,7 +67,7 @@ class AgendaSourcesTest extends TestCase
     {
         $source = Source::factory()->create(['content_hash' => sha1('ancienne page')]);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->patch("/agenda/sources/{$source->id}", ['name' => $source->name, 'url' => 'https://example.org/agenda', 'category' => ''])
             ->assertRedirect(route('agenda.sources.index'));
 
@@ -81,7 +81,7 @@ class AgendaSourcesTest extends TestCase
     {
         $source = Source::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->delete("/agenda/sources/{$source->id}")
             ->assertRedirect(route('agenda.sources.index'));
 

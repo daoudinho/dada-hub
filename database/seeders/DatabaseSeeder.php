@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Premier compte, depuis HUB_ADMIN_EMAIL / HUB_ADMIN_PASSWORD (utile sans accès au terminal du serveur).
+     * Premier compte (administrateur), depuis HUB_ADMIN_EMAIL / HUB_ADMIN_PASSWORD (utile sans accès au terminal du serveur).
      * Un compte existant n'est jamais modifié.
      */
     private function createAdmin(): void
@@ -48,7 +48,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $user = new User(['name' => $name ?: strstr($email, '@', true), 'email' => $email, 'password' => Hash::make($password)]);
-        $user->forceFill(['email_verified_at' => now()])->save();
+        $user->forceFill(['email_verified_at' => now(), 'role' => User::ROLE_ADMIN])->save();
 
         $this->command?->info('Compte créé : '.$email);
     }

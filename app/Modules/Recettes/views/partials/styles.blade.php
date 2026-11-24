@@ -224,7 +224,7 @@ h2.section .icon { color: var(--green); }
   .page { padding-inline: 28px; }
   .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
   .brand h1 { font-size: 46px; }
-  .search { display: flex; width: 300px; margin: 0; }
+  .search { display: flex; width: 300px; margin: 0 0 20px; }
   .search-toggle, .add-bar { display: none; }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .brand-title { width: auto; justify-content: flex-start; }

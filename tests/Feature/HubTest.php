@@ -21,9 +21,9 @@ class HubTest extends TestCase
         $this->get('/dashboard')->assertRedirect(route('login'));
     }
 
-    public function test_dashboard_lists_enabled_modules(): void
+    public function test_dashboard_lists_modules_open_to_the_user(): void
     {
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('Agenda Barcelone')

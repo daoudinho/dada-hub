@@ -34,7 +34,7 @@ class RecettesImportTest extends TestCase
         Queue::fake();
         $tag = Tag::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('recettes')->create())
             ->post('/recettes/import', ['name' => 'Pâtes à l\'ail', 'source_url' => 'https://cuisine.test/pates', 'tag_ids' => [$tag->id]])
             ->assertRedirect(route('recettes.show', Recipe::sole()));
 
@@ -48,7 +48,7 @@ class RecettesImportTest extends TestCase
     {
         Queue::fake();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('recettes')->create())
             ->post('/recettes/import', ['name' => 'Test', 'source_url' => 'javascript:alert(1)'])
             ->assertSessionHasErrorsIn('import', 'source_url');
 
@@ -108,7 +108,7 @@ class RecettesImportTest extends TestCase
         Queue::fake();
         $recipe = Recipe::factory()->importing()->create(['import_status' => 'failed', 'import_error' => 'HTTP 500']);
 
-        $this->actingAs(User::factory()->create())->post("/recettes/{$recipe->id}/import");
+        $this->actingAs(User::factory()->withModules('recettes')->create())->post("/recettes/{$recipe->id}/import");
 
         $this->assertTrue($recipe->fresh()->isImporting());
         Queue::assertPushed(ImportRecipeJob::class);

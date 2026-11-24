@@ -88,7 +88,7 @@ class AgendaScanOptimizationTest extends TestCase
         $recent = Source::factory()->create(['scan_every_days' => 7, 'last_status' => 'unchanged', 'last_scanned_at' => now()->subDays(2)]);
         $due = Source::factory()->create(['scan_every_days' => 7, 'last_status' => 'ok', 'last_scanned_at' => now()->subDays(8)]);
         $failed = Source::factory()->create(['scan_every_days' => 7, 'last_status' => 'failed', 'last_scanned_at' => now()->subDay()]);
-        $user = User::factory()->create();
+        $user = User::factory()->withModules('agenda')->create();
 
         $this->actingAs($user)->postJson('/agenda/scan', ['filters' => ['musique']])
             ->assertJson(['sources_total' => 2, 'sources_skipped' => 1]);
@@ -106,7 +106,7 @@ class AgendaScanOptimizationTest extends TestCase
         Bus::fake();
         Source::factory()->create(['last_status' => 'ok', 'last_scanned_at' => now()->subHour()]);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withModules('agenda')->create())
             ->postJson('/agenda/scan', ['filters' => ['musique']])
             ->assertJson(['status' => 'done', 'sources_total' => 0, 'sources_skipped' => 1]);
 
@@ -157,7 +157,7 @@ class AgendaScanOptimizationTest extends TestCase
         $this->assertSame(0, $source->fresh()->failures);
 
         $disabled = Source::factory()->inactive()->create(['failures' => 3]);
-        $this->actingAs(User::factory()->create())->patch("/agenda/sources/{$disabled->id}", ['active' => 1]);
+        $this->actingAs(User::factory()->withModules('agenda')->create())->patch("/agenda/sources/{$disabled->id}", ['active' => 1]);
         $this->assertSame(0, $disabled->fresh()->failures);
     }
 
