@@ -174,6 +174,16 @@ class CoachProfileTest extends TestCase
         $this->actingAs($this->athlete)->get('/coach/running/calendrier')->assertSee('Déplacement pro');
     }
 
+    public function test_dashboard_asks_the_feedback_of_the_latest_run_only(): void
+    {
+        RunningActivity::factory()->for($this->athlete)->create(['started_at' => now()->subDays(4)]);
+        RunningActivity::factory()->for($this->athlete)->create(['started_at' => now()->subHour()]);
+
+        $html = $this->actingAs($this->athlete)->get('/coach')->assertSee('Ta dernière course')->getContent();
+
+        $this->assertSame(1, substr_count($html, 'Effort ressenti'));
+    }
+
     public function test_dashboard_asks_for_a_quick_feedback_after_a_run_and_records_it(): void
     {
         $activity = RunningActivity::factory()->for($this->athlete)->create(['rpe' => null]);

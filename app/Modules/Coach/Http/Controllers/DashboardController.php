@@ -41,9 +41,6 @@ class DashboardController extends Controller
             $lastRun = null;
         }
 
-        $withoutFeedback = RunningActivity::ownedBy($user)->summary()->where('started_at', '>=', today()->subDays(7))
-            ->whereDoesntHave('feedbacks')->latest('started_at')->get();
-
         return view('coach::dashboard', [
             'running' => $running,
             'fitness' => $user->hasModuleFeature('coach', 'fitness'),
@@ -52,14 +49,13 @@ class DashboardController extends Controller
             'goal' => $goals->firstWhere('priority', 'main'),
             'intermediateGoals' => $goals->where('priority', 'intermediate')->values(),
             'lastRun' => $lastRun,
-            'lastRunHasFeedback' => $lastRun && ! $withoutFeedback->contains('id', $lastRun->id),
+            'lastRunHasFeedback' => $lastRun?->feedbacks()->exists() ?? false,
+            // Nuit mesurée par la montre : la question du sommeil disparaît du ressenti.
+            'lastRunNight' => $lastRun ? DailyWellness::measuredNights($user, [$lastRun->started_at])->first() : null,
             // Le débrief de la dernière course est proposé dans sa carte.
             'awaiting' => Conversation::ownedBy($user)->whereIn('kind', ['debrief', 'cancellation'])->where('status', '!=', 'closed')
                 ->when($lastRun, fn ($query) => $query->where(fn ($query) => $query->whereNull('activity_id')->orWhere('activity_id', '!=', $lastRun->id)))
                 ->latest()->get(),
-            'withoutFeedback' => $withoutFeedback->reject(fn (RunningActivity $run) => $run->id === $lastRun?->id)->values(),
-            // Nuits déjà mesurées par la montre : la question du sommeil disparaît de ces ressentis.
-            'measuredNights' => DailyWellness::measuredNights($user, $withoutFeedback->pluck('started_at')),
             'recentRuns' => RunningActivity::ownedBy($user)->summary()->with('session')->latest('started_at')->limit(5)->get(),
             'hasOnboarding' => $hasOnboarding,
             // Tant que l'athlète n'a pas fait connaissance avec son coach : parcours de démarrage.

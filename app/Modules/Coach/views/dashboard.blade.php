@@ -85,7 +85,7 @@
       @if (! $lastRunHasFeedback)
         <form method="POST" action="{{ route('coach.running.feedback.store', $lastRun) }}" class="form">
           @csrf
-          @include('coach::partials.quick-feedback', ['required' => true, 'measuredSleep' => $measuredNights->get($lastRun->started_at->toDateString())])
+          @include('coach::partials.quick-feedback', ['required' => true, 'measuredSleep' => $lastRunNight])
           <div><button class="btn">Noter</button></div>
         </form>
       @elseif (! $lastRun->review)
@@ -102,20 +102,6 @@
   @endif
 
   {{-- Ce qui attend une action --}}
-  @foreach ($withoutFeedback as $activity)
-    <section class="card alert">
-      <div class="card-head">
-        <h2>Ton ressenti</h2>
-        <span class="muted small">{{ $activity->started_at->locale('fr')->isoFormat('ddd D/MM') }} · {{ number_format($activity->distanceKm(), 1, ',', '') }} km</span>
-      </div>
-      <form method="POST" action="{{ route('coach.running.feedback.store', $activity) }}" class="form">
-        @csrf
-        @include('coach::partials.quick-feedback', ['required' => true, 'measuredSleep' => $measuredNights->get($activity->started_at->toDateString())])
-        <div><button class="btn">Noter</button></div>
-      </form>
-    </section>
-  @endforeach
-
   @foreach ($awaiting as $conversation)
     <section class="card alert">
       <div class="card-head">
