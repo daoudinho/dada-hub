@@ -12,7 +12,6 @@
 
 @section('content')
 <h1>Mon profil</h1>
-<p class="muted">Tout ce qui aide ton coach à bâtir un programme à ta mesure. Rien n'est obligatoire : ce qui manque, il te le demandera.</p>
 
 @if ($errors->any())
   <div class="errors" role="alert" style="margin-bottom:12px">
@@ -93,14 +92,9 @@
     <label class="field"><span>FC au seuil (bpm)</span><input type="number" name="threshold_hr" min="80" max="230" value="{{ old('threshold_hr', $profile->threshold_hr) }}"></label>
     <label class="field"><span>Je cours depuis (année)</span><input type="number" name="running_since" min="1950" max="{{ today()->year }}" value="{{ old('running_since', $profile->running_since) }}"></label>
   </div>
-  <p class="muted small">
-    Le poids se note depuis le tableau de bord.
-    @if ($garmin)
-      Les fréquences cardiaques sont remplies par Garmin à chaque synchronisation (elles écrasent ta saisie).@if ($profile->vo2max) VO2 max estimée par ta montre : <strong>{{ number_format($profile->vo2max, 0) }}</strong>.@endif
-    @else
-      Les FC sont facultatives : un test peut les estimer, ou ta montre Garmin les remplira.
-    @endif
-  </p>
+  @unless ($garmin)
+    <p class="muted small">Les FC sont facultatives : un test peut les estimer, ou ta montre Garmin les remplira.</p>
+  @endunless
 
   <fieldset id="cycle-settings" @if (old('sex', $profile->sex) !== 'female') hidden @endif>
     <legend>Cycle menstruel</legend>
