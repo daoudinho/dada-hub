@@ -6,10 +6,12 @@ use App\Modules\Coach\Console\ReanalyzeActivitiesCommand;
 use App\Modules\Coach\Console\RecomputeRecordsCommand;
 use App\Modules\Coach\Console\StravaWebhookCommand;
 use App\Modules\Coach\Http\Controllers\StravaWebhookController;
+use App\Modules\Coach\Http\Middleware\SyncConnectedAccounts;
 use App\Modules\Coach\Models\Conversation;
 use App\Modules\Coach\Models\CycleEntry;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Goal;
+use App\Modules\Coach\Models\GoogleHealthAccount;
 use App\Modules\Coach\Models\Injury;
 use App\Modules\Coach\Models\PastRace;
 use App\Modules\Coach\Models\Proposal;
@@ -50,6 +52,16 @@ class CoachModule extends Module
         return '🏃';
     }
 
+    /**
+     * Middlewares du module, plus la synchronisation automatique des comptes reliés (Garmin, Google Health).
+     *
+     * @return array<int, string>
+     */
+    public function middleware(): array
+    {
+        return [...parent::middleware(), SyncConnectedAccounts::class];
+    }
+
     public function consoleCommands(): array
     {
         return [StravaWebhookCommand::class, RecomputeRecordsCommand::class, ReanalyzeActivitiesCommand::class];
@@ -74,10 +86,11 @@ class CoachModule extends Module
         }
 
         // Débriefs et retours d'annulation en attente, signalés dans la barre du module.
-        // Bouton de synchronisation Garmin dans l'en-tête (avec une clé seulement).
+        // Bouton de synchronisation dans l'en-tête : Garmin (avec une clé), sinon Google Health (compte relié).
         View::composer('coach::partials.topbar', fn ($view) => $view->with([
             'awaitingCount' => Conversation::ownedBy(auth()->user())->whereIn('kind', ['debrief', 'cancellation'])->where('status', '!=', 'closed')->count(),
             'hasGarmin' => GarminAccount::ownedBy(auth()->user())->exists(),
+            'hasGoogleHealth' => GoogleHealthAccount::ownedBy(auth()->user())->exists(),
         ]));
     }
 }

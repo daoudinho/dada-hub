@@ -12,6 +12,7 @@ use App\Modules\Coach\Http\Controllers\ExploitController;
 use App\Modules\Coach\Http\Controllers\FeedbackController;
 use App\Modules\Coach\Http\Controllers\GarminController;
 use App\Modules\Coach\Http\Controllers\GoalController;
+use App\Modules\Coach\Http\Controllers\GoogleHealthController;
 use App\Modules\Coach\Http\Controllers\ProfileController;
 use App\Modules\Coach\Http\Controllers\ProposalController;
 use App\Modules\Coach\Http\Controllers\Running\ActivityController;
@@ -48,6 +49,11 @@ Route::get('strava/retour', [StravaController::class, 'callback'])->name('strava
 Route::post('strava/synchroniser', [StravaController::class, 'sync'])->middleware('throttle:6,1')->name('strava.sync');
 Route::delete('strava', [StravaController::class, 'disconnect'])->name('strava.disconnect');
 // Le webhook (public, sans session) est déclaré dans CoachModule.
+
+Route::get('google-health/connexion', [GoogleHealthController::class, 'connect'])->name('google-health.connect');
+Route::get('google-health/retour', [GoogleHealthController::class, 'callback'])->name('google-health.callback');
+Route::post('google-health/synchroniser', [GoogleHealthController::class, 'sync'])->middleware('throttle:6,1')->name('google-health.sync');
+Route::delete('google-health', [GoogleHealthController::class, 'disconnect'])->name('google-health.disconnect');
 
 Route::post('objectifs', [GoalController::class, 'store'])->name('goals.store');
 Route::patch('objectifs/{goal}', [GoalController::class, 'update'])->name('goals.update');

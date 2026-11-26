@@ -160,7 +160,9 @@ class CoachNavigationTest extends TestCase
     {
         $runner = User::factory()->withModules('coach')->withFeatures(['coach' => ['running']])->create();
 
-        $this->actingAs($runner)->get('/coach')->assertSee('Dada Coach')->assertSee('Retour au Hub')->assertDontSee('Synchroniser avec Garmin');
+        $this->actingAs($runner)->get('/coach/profil')->assertSee('Dada Coach')->assertDontSee('Synchroniser avec Garmin')
+            ->assertSee('href="'.route('coach.index').'" title="Accueil du coach"', false)
+            ->assertSee('href="'.route('dashboard').'" title="Accueil du Hub"', false);
 
         (new GarminAccount(['api_key' => 'gk_live_0123456789abcdef']))->user()->associate($runner)->save();
         $this->actingAs($runner)->get('/coach')->assertSee('Synchroniser avec Garmin')->assertSee(route('coach.garmin.sync'), false);

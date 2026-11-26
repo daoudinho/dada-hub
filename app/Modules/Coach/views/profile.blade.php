@@ -305,6 +305,38 @@
   @endif
 </section>
 
+{{-- Google Health --}}
+<section class="card section" id="google-health">
+  <h2>Google Health</h2>
+  @if ($googleHealth)
+    @if ($googleHealth->needsReconnect())
+      <p class="errors">L'autorisation Google a expiré : relie ton compte de nouveau pour que tes courses continuent d'arriver.</p>
+      <a class="btn" href="{{ route('coach.google-health.connect') }}">Relier de nouveau</a>
+    @else
+      <p>Compte Google relié.
+        <span class="muted small">
+          @if ($googleHealth->last_synced_at) Dernière synchronisation {{ $googleHealth->last_synced_at->locale('fr')->diffForHumans() }}.@elseif (! $googleHealth->last_error) Import de l'historique en cours…@endif
+        </span>
+      </p>
+      @if ($googleHealth->last_error)
+        <p class="errors">Dernière synchronisation impossible : {{ $googleHealth->last_error }}</p>
+      @endif
+      <p class="muted small">Tes courses arrivent depuis ta montre (Samsung Health → Health Connect → Google Health) : distance, durée, allure, FC moyenne{{ $googleHealth->canReadHeartRate() ? ' et courbe cardiaque' : '' }}.</p>
+    @endif
+    <div class="actions">
+      @unless ($googleHealth->needsReconnect())
+        <form method="POST" action="{{ route('coach.google-health.sync') }}" class="inline">@csrf<button class="btn ghost small">Synchroniser</button></form>
+      @endunless
+      <form method="POST" action="{{ route('coach.google-health.disconnect') }}" class="inline" onsubmit="return confirm('Déconnecter Google Health ? Tes courses déjà importées restent.')">
+        @csrf @method('DELETE')<button class="btn danger small">Déconnecter</button>
+      </form>
+    </div>
+  @else
+    <p class="muted">Montre Samsung ou autre : si tes courses apparaissent dans l'app Google Health de ton téléphone, relie ton compte Google pour qu'elles arrivent chez ton coach.</p>
+    <a class="btn" href="{{ route('coach.google-health.connect') }}">Relier Google Health</a>
+  @endif
+</section>
+
 {{-- Repères calculés --}}
 <section class="card section" id="reperes">
   <h2>Tes repères</h2>

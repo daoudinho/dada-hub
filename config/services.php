@@ -57,6 +57,12 @@ return [
         'subscription_id' => env('STRAVA_SUBSCRIPTION_ID'), // donné par « php artisan coach:strava-webhook --create »
     ],
 
+    // Client OAuth Google du coach (Google Cloud → Google Auth Platform → Clients) : lecture des courses via la Google Health API.
+    'google_health' => [
+        'client_id' => env('GOOGLE_HEALTH_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_HEALTH_CLIENT_SECRET'),
+    ],
+
     'firecrawl' => [
         'key' => env('FIRECRAWL_API_KEY'),
         'max_age' => (int) env('FIRECRAWL_MAX_AGE', 3600000), // ms : copie en cache Firecrawl acceptée (1 h)

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * Course réellement faite : saisie à la main, ou importée de Strava (plus tard) avec ses tours et ses flux.
+ * Course réellement faite : saisie à la main, ou importée (Garmin, Strava, Google Health) avec ses tours et ses flux.
  */
 class RunningActivity extends Model
 {
@@ -92,7 +92,7 @@ class RunningActivity extends Model
     /** Montre ou application reliée : les courses arrivent seules. */
     public static function syncedFor(User $user): bool
     {
-        return GarminAccount::ownedBy($user)->exists() || StravaAccount::ownedBy($user)->exists();
+        return GarminAccount::ownedBy($user)->exists() || StravaAccount::ownedBy($user)->exists() || GoogleHealthAccount::ownedBy($user)->exists();
     }
 
     public function debriefTitle(): string
@@ -123,6 +123,7 @@ class RunningActivity extends Model
         return match ($this->source) {
             'garmin' => 'Garmin',
             'strava' => 'Strava',
+            'google_health' => 'Google Health',
             default => 'Saisie',
         };
     }

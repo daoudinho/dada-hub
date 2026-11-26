@@ -22,6 +22,9 @@ return [
         'max_tool_rounds' => 6,
     ],
 
+    /** Synchronisation automatique (Garmin, Google Health) à l'ouverture du coach, si la dernière date de plus de (minutes). */
+    'auto_sync_minutes' => 30,
+
     /** Graphique du poids : période affichée (jours). */
     'weight_chart_days' => 180,
 
@@ -43,6 +46,18 @@ return [
 
         /** Types d'activité Strava importés comme courses. */
         'run_types' => ['Run', 'TrailRun', 'VirtualRun'],
+    ],
+
+    /*
+     * Google Health (client OAuth dans config/services.php, section « google_health ») : les courses de la montre
+     * arrivées par Health Connect (Samsung Health…). Le délai du débrief est celui de Strava.
+     */
+    'google_health' => [
+        /** Historique importé à la connexion (mois). */
+        'backfill_months' => 24,
+
+        /** Types de séance Google Health importés comme courses. */
+        'run_types' => ['RUNNING', 'TRAIL_RUN', 'TREADMILL', 'INCLINE_RUN'],
     ],
 
 ];

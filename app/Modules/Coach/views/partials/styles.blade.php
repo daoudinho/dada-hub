@@ -34,9 +34,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .page.narrow { max-width: 720px; }
 
 /* En-tête du module */
-.appbar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 56px;
+.appbar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 88px 1fr 88px; align-items: center; height: 56px;
   margin: 0 -16px 12px; padding: 0 8px; background: rgba(10, 11, 13, .92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .appbar h1 { margin: 0; font-size: 17px; text-align: center; letter-spacing: .01em; }
+.appbar-actions { display: flex; justify-content: flex-end; align-items: center; }
 .icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; text-decoration: none; }
 .icon-btn:hover { background: var(--surface); }
 .icon-btn svg { width: 22px; height: 22px; }
@@ -79,7 +80,7 @@ h2 { font-size: 17px; margin: 0 0 12px; }
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface); border-radius: 12px; }
 .list .when { font-weight: 700; min-width: 72px; }
-.list .what { flex: 1; min-width: 0; }
+.list .what { flex: 1; min-width: 0; text-decoration: none; }
 
 /* Boutons et formulaires */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 15px; cursor: pointer; text-decoration: none; background: var(--brand); color: var(--brand-fg); }

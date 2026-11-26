@@ -1,15 +1,21 @@
-{{-- En-tête et navigation du module (onglets sur ordinateur, barre du bas sur mobile). $awaitingCount et $hasGarmin viennent de CoachModule. --}}
+{{-- En-tête et navigation du module (onglets sur ordinateur, barre du bas sur mobile). $awaitingCount, $hasGarmin et $hasGoogleHealth viennent de CoachModule. --}}
 <header class="appbar">
-  <a class="icon-btn" href="{{ route('dashboard') }}" title="Retour au Hub">@include('coach::partials.icon', ['name' => 'back'])<span class="sr-only">Retour au Hub</span></a>
+  <a class="icon-btn" href="{{ route('coach.index') }}" title="Accueil du coach">@include('coach::partials.icon', ['name' => 'back'])<span class="sr-only">Accueil du coach</span></a>
   <h1>Dada Coach</h1>
-  @if ($hasGarmin)
-    <form method="POST" action="{{ route('coach.garmin.sync') }}">
-      @csrf
-      <button class="icon-btn sync-btn" title="Synchroniser avec Garmin">@include('coach::partials.icon', ['name' => 'refresh'])<span class="sr-only">Synchroniser avec Garmin</span></button>
-    </form>
-  @else
-    <span></span>
-  @endif
+  <div class="appbar-actions">
+    <a class="icon-btn" href="{{ route('dashboard') }}" title="Accueil du Hub">@include('coach::partials.icon', ['name' => 'home'])<span class="sr-only">Accueil du Hub</span></a>
+    @if ($hasGarmin)
+      <form method="POST" action="{{ route('coach.garmin.sync') }}">
+        @csrf
+        <button class="icon-btn sync-btn" title="Synchroniser avec Garmin">@include('coach::partials.icon', ['name' => 'refresh'])<span class="sr-only">Synchroniser avec Garmin</span></button>
+      </form>
+    @elseif ($hasGoogleHealth)
+      <form method="POST" action="{{ route('coach.google-health.sync') }}">
+        @csrf
+        <button class="icon-btn sync-btn" title="Synchroniser avec Google Health">@include('coach::partials.icon', ['name' => 'refresh'])<span class="sr-only">Synchroniser avec Google Health</span></button>
+      </form>
+    @endif
+  </div>
 </header>
 
 @php

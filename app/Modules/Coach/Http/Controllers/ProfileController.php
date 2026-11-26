@@ -7,6 +7,7 @@ use App\Modules\Coach\Models\CycleEntry;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Gear;
 use App\Modules\Coach\Models\Goal;
+use App\Modules\Coach\Models\GoogleHealthAccount;
 use App\Modules\Coach\Models\Injury;
 use App\Modules\Coach\Models\PastRace;
 use App\Modules\Coach\Models\Profile;
@@ -39,6 +40,7 @@ class ProfileController extends Controller
             'cycle' => $cycleTracker->status($user),
             'garmin' => GarminAccount::ownedBy($user)->first(),
             'strava' => StravaAccount::ownedBy($user)->first(),
+            'googleHealth' => GoogleHealthAccount::ownedBy($user)->first(),
             'gear' => Gear::ownedBy($user)->where('retired', false)->orderByDesc('primary')->get(),
             'cycleEntries' => $profile->tracksCycle() ? CycleEntry::ownedBy($user)->orderByDesc('started_on')->limit(12)->get() : collect(),
         ]);
