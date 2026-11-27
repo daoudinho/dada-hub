@@ -10,6 +10,7 @@ use App\Modules\Coach\Models\Profile;
 use App\Modules\Coach\Models\RunningActivity;
 use App\Modules\Coach\Models\RunningSession;
 use App\Modules\Coach\Models\WeightEntry;
+use App\Modules\Coach\Models\Workout;
 use App\Modules\Coach\Services\Charts;
 use App\Modules\Coach\Services\CycleTracker;
 use App\Modules\Coach\Services\GettingStarted;
@@ -20,7 +21,7 @@ use Illuminate\View\View;
 
 /**
  * Accueil : objectif, actions en attente, puis selon les sous-modules ouverts (Running : prochaines séances, historique,
- * exploits, kilomètres ; Fitness : poids), récupération et cycle.
+ * exploits, kilomètres ; Fitness : raccourci en tête et poids), récupération et cycle.
  */
 class DashboardController extends Controller
 {
@@ -28,6 +29,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $running = $user->hasModuleFeature('coach', 'running');
+        $fitness = $user->hasModuleFeature('coach', 'fitness');
 
         $weights = WeightEntry::ownedBy($user)
             ->where('measured_on', '>=', today()->subDays((int) config('coach.weight_chart_days')))
@@ -43,7 +45,8 @@ class DashboardController extends Controller
 
         return view('coach::dashboard', [
             'running' => $running,
-            'fitness' => $user->hasModuleFeature('coach', 'fitness'),
+            'fitness' => $fitness,
+            'lastWorkout' => $fitness ? Workout::ownedBy($user)->latest('performed_on')->latest('id')->first() : null,
             'exploits' => $running ? $records->exploits($user) : [],
             'profile' => Profile::ownedBy($user)->first(),
             'goal' => $goals->firstWhere('priority', 'main'),

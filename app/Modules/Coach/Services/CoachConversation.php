@@ -110,8 +110,10 @@ class CoachConversation
 
     private function converse(User $user, Conversation $conversation): void
     {
+        $fitness = $user->hasModuleFeature('coach', 'fitness');
+
         for ($round = 0; $round <= (int) config('coach.ai.max_tool_rounds'); $round++) {
-            $response = $this->claude->send(CoachPrompt::system(), $this->history($conversation), $this->tools->definitions());
+            $response = $this->claude->send(CoachPrompt::system($fitness), $this->history($conversation), $this->tools->definitions($fitness));
 
             $visibleText = collect($response['content'])->where('type', 'text')->pluck('text')->implode("\n\n");
             if ($response['stop_reason'] === 'refusal' && trim($visibleText) === '') {

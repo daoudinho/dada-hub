@@ -2,6 +2,7 @@
 
 namespace App\Modules\Coach;
 
+use App\Models\User;
 use App\Modules\Coach\Console\ReanalyzeActivitiesCommand;
 use App\Modules\Coach\Console\RecomputeRecordsCommand;
 use App\Modules\Coach\Console\StravaWebhookCommand;
@@ -9,6 +10,8 @@ use App\Modules\Coach\Http\Controllers\StravaWebhookController;
 use App\Modules\Coach\Http\Middleware\SyncConnectedAccounts;
 use App\Modules\Coach\Models\Conversation;
 use App\Modules\Coach\Models\CycleEntry;
+use App\Modules\Coach\Models\Equipment;
+use App\Modules\Coach\Models\Exercise;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Goal;
 use App\Modules\Coach\Models\GoogleHealthAccount;
@@ -19,6 +22,7 @@ use App\Modules\Coach\Models\RunningActivity;
 use App\Modules\Coach\Models\RunningSession;
 use App\Modules\Coach\Models\Unavailability;
 use App\Modules\Coach\Models\WeightEntry;
+use App\Modules\Coach\Models\Workout;
 use App\Modules\Coach\Policies\OwnerPolicy;
 use App\Modules\Module;
 use Illuminate\Support\Facades\Gate;
@@ -44,7 +48,7 @@ class CoachModule extends Module
 
     public function description(): string
     {
-        return 'Profil, courbe de poids et coach running IA : objectifs, programme, débriefs après chaque course.';
+        return 'Profil, courbe de poids et coach IA running et fitness : objectifs, programme, débriefs, carnet de salle.';
     }
 
     public function icon(): string
@@ -80,10 +84,13 @@ class CoachModule extends Module
         }
 
         // Chaque donnée du coach n'est visible et modifiable que par son propriétaire.
-        foreach ([Conversation::class, CycleEntry::class, Goal::class, Injury::class, PastRace::class, Proposal::class,
-            RunningActivity::class, RunningSession::class, Unavailability::class, WeightEntry::class] as $model) {
+        foreach ([Conversation::class, CycleEntry::class, Equipment::class, Exercise::class, Goal::class, Injury::class, PastRace::class, Proposal::class,
+            RunningActivity::class, RunningSession::class, Unavailability::class, WeightEntry::class, Workout::class] as $model) {
             Gate::policy($model, OwnerPolicy::class);
         }
+
+        // Onglet Fitness et outils fitness du coach : seulement si le sous-module est ouvert à ce compte.
+        Gate::define('coach-fitness', fn (User $user) => $user->hasModuleFeature('coach', 'fitness'));
 
         // Débriefs et retours d'annulation en attente, signalés dans la barre du module.
         // Bouton de synchronisation dans l'en-tête : Garmin (avec une clé), sinon Google Health (compte relié).
