@@ -171,6 +171,19 @@ class CoachModuleTest extends TestCase
             ->assertSee('Revenir à cette semaine');
     }
 
+    public function test_only_cancelling_today_s_session_shows_the_motivation_video_first(): void
+    {
+        $this->travelTo('2026-11-18 10:00');
+        $today = RunningSession::factory()->for($this->athlete)->create(['scheduled_on' => '2026-11-18']);
+        $tomorrow = RunningSession::factory()->for($this->athlete)->create(['scheduled_on' => '2026-11-19']);
+
+        $this->actingAs($this->athlete)->get('/coach/running/calendrier')
+            ->assertOk()
+            ->assertSee('videos/motivation.mp4')
+            ->assertSee('seances/'.$today->id.'/annuler" class="form" style="margin-top:12px" data-motivation', false)
+            ->assertDontSee('seances/'.$tomorrow->id.'/annuler" class="form" style="margin-top:12px" data-motivation', false);
+    }
+
     public function test_run_form_preselects_the_planned_session(): void
     {
         $session = RunningSession::factory()->for($this->athlete)->create(['title' => 'Footing du jour']);

@@ -85,7 +85,7 @@
           <a class="btn" href="{{ route('coach.running.activities.create', ['seance' => $session->id]) }}">Je l'ai faite</a>
         </div>
       @endif
-      <form method="POST" action="{{ route('coach.running.sessions.cancel', $session) }}" class="form" style="margin-top:12px">
+      <form method="POST" action="{{ route('coach.running.sessions.cancel', $session) }}" class="form" style="margin-top:12px" {{ $session->scheduled_on->isToday() ? 'data-motivation' : '' }}>
         @csrf
         <label class="field"><span>Annuler la séance (raison facultative)</span><input name="reason" maxlength="500" placeholder="Fatigue, douleur, imprévu…"></label>
         <div><button class="btn danger small">Annuler la séance</button></div>
@@ -95,12 +95,48 @@
     <form method="dialog" class="actions"><button class="btn ghost small">Fermer</button></form>
   </dialog>
 @endforeach
+
+{{-- Annuler la séance du jour : une vidéo de motivation d'abord, l'annulation seulement si on insiste. --}}
+<dialog id="motivation" class="motivation" aria-labelledby="motivation-title">
+  <h2 id="motivation-title">Attends, avant d'annuler…</h2>
+  <video src="{{ asset('videos/motivation.mp4') }}" playsinline controls preload="none"></video>
+  <div class="actions">
+    <button type="button" class="btn" data-motivation-go>OK, j'y vais !</button>
+    <button type="button" class="btn danger small" data-motivation-cancel>Annuler quand même</button>
+  </div>
+</dialog>
 @endsection
 
 @push('scripts')
 <script>
 document.querySelectorAll('[data-dialog]').forEach((button) => {
   button.addEventListener('click', () => document.getElementById(button.dataset.dialog)?.showModal());
+});
+// Séance du jour : le bouton « Annuler » montre d'abord la vidéo de motivation.
+const motivation = document.getElementById('motivation');
+const motivationVideo = motivation.querySelector('video');
+let cancelForm = null;
+document.querySelectorAll('form[data-motivation]').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    if (form.dataset.confirmed) {
+      return;
+    }
+    event.preventDefault();
+    cancelForm = form;
+    motivation.showModal();
+    motivationVideo.currentTime = 0;
+    motivationVideo.play().catch(() => {});
+  });
+});
+motivation.addEventListener('close', () => motivationVideo.pause());
+motivation.querySelector('[data-motivation-go]').addEventListener('click', () => {
+  motivation.close();
+  cancelForm?.closest('dialog')?.close();
+});
+motivation.querySelector('[data-motivation-cancel]').addEventListener('click', () => {
+  motivation.close();
+  cancelForm.dataset.confirmed = '1';
+  cancelForm.requestSubmit();
 });
 // Arrivée depuis l'Accueil (?seance=12) : le détail de la séance s'ouvre directement.
 const requested = new URLSearchParams(location.search).get('seance');

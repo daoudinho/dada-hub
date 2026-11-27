@@ -273,6 +273,7 @@ details.add summary { cursor: pointer; font-weight: 700; color: var(--brand); ma
 dialog { border: 0; border-radius: var(--radius); padding: 20px; max-width: min(520px, calc(100vw - 32px)); width: 100%; background: var(--card); color: var(--fg); box-shadow: var(--shadow); }
 dialog::backdrop { background: rgba(10, 15, 25, .5); }
 dialog h2 { margin-top: 0; }
+.motivation video { display: block; width: 100%; max-height: 70vh; border-radius: 12px; background: #000; margin-bottom: 12px; }
 .desc { white-space: pre-line; }
 
 /* Chat */
