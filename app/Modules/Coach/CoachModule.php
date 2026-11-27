@@ -3,6 +3,7 @@
 namespace App\Modules\Coach;
 
 use App\Models\User;
+use App\Modules\Coach\Console\ImportStravaExportCommand;
 use App\Modules\Coach\Console\ReanalyzeActivitiesCommand;
 use App\Modules\Coach\Console\RecomputeRecordsCommand;
 use App\Modules\Coach\Console\StravaWebhookCommand;
@@ -70,7 +71,7 @@ class CoachModule extends Module
 
     public function consoleCommands(): array
     {
-        return [StravaWebhookCommand::class, RecomputeRecordsCommand::class, ReanalyzeActivitiesCommand::class];
+        return [StravaWebhookCommand::class, RecomputeRecordsCommand::class, ReanalyzeActivitiesCommand::class, ImportStravaExportCommand::class];
     }
 
     public function boot(): void

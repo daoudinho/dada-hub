@@ -23,6 +23,7 @@ use App\Modules\Coach\Http\Controllers\Running\AfterRunController;
 use App\Modules\Coach\Http\Controllers\Running\CalendarController;
 use App\Modules\Coach\Http\Controllers\Running\SessionController;
 use App\Modules\Coach\Http\Controllers\StravaController;
+use App\Modules\Coach\Http\Controllers\StravaExportController;
 use App\Modules\Coach\Http\Controllers\SyncAccountController;
 use App\Modules\Coach\Http\Controllers\WeightController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,7 @@ Route::get('strava/connexion', [StravaController::class, 'connect'])->name('stra
 Route::get('strava/retour', [StravaController::class, 'callback'])->name('strava.callback');
 Route::post('strava/synchroniser', [StravaController::class, 'sync'])->middleware('throttle:6,1')->name('strava.sync');
 Route::delete('strava', [StravaController::class, 'disconnect'])->name('strava.disconnect');
+Route::post('strava/export', [StravaExportController::class, 'store'])->middleware('throttle:3,1')->name('strava.export');
 // Le webhook (public, sans session) est déclaré dans CoachModule.
 
 Route::get('google-health/connexion', [GoogleHealthController::class, 'connect'])->name('google-health.connect');

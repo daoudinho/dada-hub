@@ -3,6 +3,7 @@
 namespace App\Modules\Coach\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Coach\Jobs\ImportStravaExportJob;
 use App\Modules\Coach\Models\CycleEntry;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Gear;
@@ -18,6 +19,7 @@ use App\Modules\Coach\Services\CycleTracker;
 use App\Modules\Coach\Services\ReferencePaces;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -41,6 +43,7 @@ class ProfileController extends Controller
             'cycle' => $cycleTracker->status($user),
             'garmin' => GarminAccount::ownedBy($user)->first(),
             'strava' => StravaAccount::ownedBy($user)->first(),
+            'stravaExport' => Cache::get(ImportStravaExportJob::statusKey($user->id)),
             'googleHealth' => GoogleHealthAccount::ownedBy($user)->first(),
             'syncAccount' => SyncAccount::ownedBy($user)->first(),
             'gear' => Gear::ownedBy($user)->where('retired', false)->orderByDesc('primary')->get(),
