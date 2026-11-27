@@ -7,6 +7,7 @@ use App\Modules\Coach\Jobs\ImportGarminActivityJob;
 use App\Modules\Coach\Jobs\ImportStravaActivityJob;
 use App\Modules\Coach\Models\BestEffort;
 use App\Modules\Coach\Models\Conversation;
+use App\Modules\Coach\Models\Exercise;
 use App\Modules\Coach\Models\Feedback;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Goal;
@@ -20,6 +21,7 @@ use App\Modules\Coach\Models\RunningPlan;
 use App\Modules\Coach\Models\RunningSession;
 use App\Modules\Coach\Models\StravaAccount;
 use App\Modules\Coach\Models\Unavailability;
+use App\Modules\Coach\Models\Workout;
 use App\Modules\Coach\Services\Garmin\GarminImporter;
 use App\Modules\Coach\Services\Garmin\GarminUnavailable;
 use App\Modules\Coach\Services\Strava\StravaImporter;
@@ -42,14 +44,30 @@ class CoachTools
     /** Écart entre deux imports en arrière-plan (2 requêtes Strava chacun, limite de 100 par quart d'heure). */
     private const FETCH_SPACING_SECONDS = 20;
 
-    public function __construct(private AvailabilityCheck $availability, private RunInsights $runInsights) {}
+    /** Outils réservés aux comptes à qui le Fitness est ouvert. */
+    private const FITNESS_TOOLS = ['propose_exercises', 'record_workout', 'get_fitness_history'];
+
+    public function __construct(
+        private AvailabilityCheck $availability,
+        private RunInsights $runInsights,
+        private GymCatalog $gym,
+        private WorkoutRecorder $workouts,
+    ) {}
 
     /**
-     * Définitions envoyées à l'API (ordre fixe : il fait partie du préfixe mis en cache).
+     * Définitions envoyées à l'API (ordre fixe : il fait partie du préfixe mis en cache), outils fitness en dernier.
      *
      * @return list<array<string, mixed>>
      */
-    public function definitions(): array
+    public function definitions(bool $fitness = false): array
+    {
+        return $fitness ? [...$this->runningDefinitions(), ...$this->fitnessDefinitions()] : $this->runningDefinitions();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function runningDefinitions(): array
     {
         $session = [
             'type' => 'object',
@@ -280,6 +298,82 @@ class CoachTools
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    private function fitnessDefinitions(): array
+    {
+        $muscles = ['type' => 'array', 'items' => ['type' => 'string', 'enum' => array_keys(Exercise::MUSCLES)]];
+
+        return [
+            [
+                'name' => 'propose_exercises',
+                'description' => 'Propose des exercices à ajouter au catalogue de l\'athlète, avec la machine ou l\'accessoire dont chacun a besoin. '
+                    .'Pour chacun, il répond « J\'ai » (machine et exercice ajoutés), « Pas dans ma salle » (machine notée absente) ou « Non merci » (sans machine). '
+                    .'C\'est ainsi que tu découvres sa salle : ne propose pas une machine déjà notée absente, ni un exercice déjà dans son catalogue.',
+                'input_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'reason' => ['type' => 'string', 'description' => 'Pourquoi ces exercices, en une phrase, montrée à l\'athlète.'],
+                        'items' => ['type' => 'array', 'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'name' => ['type' => 'string', 'description' => 'Nom courant en français, ex. « Presse à cuisses », « Clamshell ».'],
+                                'equipment' => ['type' => 'string', 'description' => 'Machine ou accessoire nécessaire, ex. « Presse à cuisses », « Élastique » ; absent pour un exercice au poids du corps. Reprends le nom exact d\'une machine déjà connue.'],
+                                'measure' => ['type' => 'string', 'enum' => array_keys(Exercise::MEASURES), 'description' => 'load_reps : charge × répétitions ; reps : répétitions sans charge ; duration : durée (gainage).'],
+                                'muscles' => $muscles + ['description' => 'Muscles principaux.'],
+                                'secondary_muscles' => $muscles,
+                                'unilateral' => ['type' => 'boolean', 'description' => 'Séries faites de chaque côté.'],
+                                'notes' => ['type' => 'string', 'description' => 'Consigne d\'exécution en une ou deux phrases.'],
+                            ],
+                            'required' => ['name', 'measure', 'muscles'],
+                        ], 'description' => '8 exercices au plus.'],
+                    ],
+                    'required' => ['reason', 'items'],
+                ],
+            ],
+            [
+                'name' => 'record_workout',
+                'description' => 'Enregistre une séance de fitness racontée par l\'athlète (« aujourd\'hui 3 séries de presse à 100 kg »). '
+                    .'Chaque ligne : un exercice de son catalogue ([#id] de la fiche), le nombre de séries identiques, les répétitions (ou la durée) et la charge. '
+                    .'Des séries différentes font plusieurs lignes. Un exercice absent du catalogue se propose d\'abord (propose_exercises).',
+                'input_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'performed_on' => ['type' => 'string', 'description' => 'AAAA-MM-JJ, aujourd\'hui ou avant.'],
+                        'duration_minutes' => ['type' => 'integer'],
+                        'rpe' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 10, 'description' => 'Effort ressenti de la séance, s\'il le donne.'],
+                        'notes' => ['type' => 'string', 'description' => 'Ce qu\'il a dit de la séance, en une phrase.'],
+                        'entries' => ['type' => 'array', 'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'exercise_id' => ['type' => 'integer'],
+                                'sets' => ['type' => 'integer', 'description' => 'Nombre de séries identiques (1 par défaut).'],
+                                'reps' => ['type' => 'integer'],
+                                'load_kg' => ['type' => 'number', 'description' => 'Charge ajoutée, en kg (rien au poids du corps).'],
+                                'duration_seconds' => ['type' => 'integer', 'description' => 'Durée d\'une série, pour un exercice mesuré en durée.'],
+                            ],
+                            'required' => ['exercise_id'],
+                        ]],
+                    ],
+                    'required' => ['performed_on', 'entries'],
+                ],
+            ],
+            [
+                'name' => 'get_fitness_history',
+                'description' => 'Liste les séances de fitness d\'une période plus ancienne que celle de la fiche, avec leurs séries.',
+                'input_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'from' => ['type' => 'string', 'description' => 'AAAA-MM-JJ'],
+                        'to' => ['type' => 'string', 'description' => 'AAAA-MM-JJ'],
+                    ],
+                    'required' => ['from', 'to'],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * Exécute un appel d'outil et renvoie le texte du résultat.
      *
      * @param  array<string, mixed>  $input
@@ -288,6 +382,10 @@ class CoachTools
      */
     public function run(User $user, Conversation $conversation, string $name, array $input): string
     {
+        if (in_array($name, self::FITNESS_TOOLS, true) && ! $user->hasModuleFeature('coach', 'fitness')) {
+            throw ValidationException::withMessages(['name' => 'Le Fitness n\'est pas ouvert à cet athlète.']);
+        }
+
         return match ($name) {
             'set_goal' => $this->setGoal($user, $input),
             'propose_plan' => $this->proposePlan($user, $conversation, $input),
@@ -300,6 +398,9 @@ class CoachTools
             'get_activity_details' => $this->activityDetails($user, $input),
             'fetch_garmin_activities' => $this->fetchGarmin($user, $input),
             'write_session_review' => $this->writeSessionReview($conversation, $input),
+            'propose_exercises' => $this->proposeExercises($user, $conversation, $input),
+            'record_workout' => $this->recordWorkout($user, $input),
+            'get_fitness_history' => $this->fitnessHistory($user, $input),
             default => throw ValidationException::withMessages(['name' => 'Outil inconnu : '.$name]),
         };
     }
@@ -655,12 +756,78 @@ class CoachTools
     }
 
     /**
+     * @param  array<string, mixed>  $input
+     */
+    private function proposeExercises(User $user, Conversation $conversation, array $input): string
+    {
+        $data = Validator::make($input, [
+            'reason' => ['required', 'string', 'max:500'],
+            'items' => ['required', 'array', 'min:1', 'max:8'],
+            ...GymCatalog::exerciseRules('items.*.'),
+            'items.*.equipment' => ['nullable', 'string', 'max:100'],
+        ])->validate();
+
+        $problems = [];
+        foreach ($data['items'] as $item) {
+            if ($this->gym->findExercise($user, $item['name'])) {
+                $problems[] = '« '.$item['name'].' » est déjà dans son catalogue';
+            }
+            if (filled($item['equipment'] ?? null) && $this->gym->findEquipment($user, $item['equipment'])?->status === 'missing') {
+                $problems[] = '« '.$item['equipment'].' » n\'est pas dans sa salle';
+            }
+        }
+        if (collect($data['items'])->map(fn (array $item) => mb_strtolower(trim($item['name'])))->duplicates()->isNotEmpty()) {
+            $problems[] = 'un exercice apparaît deux fois';
+        }
+        if ($problems) {
+            throw ValidationException::withMessages(['items' => ucfirst(implode(' ; ', $problems)).'. Propose autre chose à la place.']);
+        }
+
+        $items = array_map(fn (array $item) => collect($item)->only(['name', 'equipment', 'measure', 'muscles', 'secondary_muscles', 'unilateral', 'notes'])->all(), $data['items']);
+        $proposal = $this->propose($user, $conversation, 'exercises', $data['reason'], ['items' => $items]);
+
+        return 'Proposition #'.$proposal->id.' enregistrée ('.count($items).' exercices). Elle s\'affiche sous ton message : l\'athlète répond exercice par exercice. '
+            .'Les réponses apparaîtront dans sa salle (fiche) ; ne programme que les exercices ajoutés.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function recordWorkout(User $user, array $input): string
+    {
+        $data = Validator::make($input, WorkoutRecorder::rules())->validate();
+        $workout = $this->workouts->record($user, $data, 'chat');
+
+        return 'Séance [#'.$workout->id.'] enregistrée : '.$workout->summary().'. Elle apparaît dans son onglet Fitness.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function fitnessHistory(User $user, array $input): string
+    {
+        $data = Validator::make($input, [
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ])->validate();
+
+        $workouts = Workout::ownedBy($user)->with('sets.exercise')->whereBetween('performed_on', [$data['from'], $data['to']])->orderBy('performed_on')->limit(100)->get();
+
+        return $workouts->isEmpty()
+            ? 'Aucune séance de fitness sur cette période.'
+            : "Séances de fitness :\n".$workouts->map(fn (Workout $workout) => '- [#'.$workout->id.'] '.$workout->summary())->implode("\n");
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function propose(User $user, Conversation $conversation, string $kind, string $reason, array $payload): Proposal
     {
-        // Une nouvelle proposition remplace celles encore en attente dans cette conversation.
-        $conversation->proposals()->where('status', 'pending')->update(['status' => 'refused']);
+        // Une nouvelle proposition remplace celles du même genre encore en attente dans cette conversation
+        // (programme et ajustement d'un côté, exercices de l'autre).
+        $conversation->proposals()->where('status', 'pending')
+            ->when($kind === 'exercises', fn ($query) => $query->where('kind', 'exercises'), fn ($query) => $query->where('kind', '!=', 'exercises'))
+            ->update(['status' => 'refused']);
 
         $proposal = new Proposal(['conversation_id' => $conversation->id, 'kind' => $kind, 'reason' => $reason, 'payload' => $payload, 'status' => 'pending']);
         $proposal->user()->associate($user)->save();

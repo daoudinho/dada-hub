@@ -200,6 +200,23 @@ details.add summary { cursor: pointer; font-weight: 700; color: var(--brand); ma
 .quick .field > span { margin-bottom: 2px; }
 .cal .day.unavailable { background: repeating-linear-gradient(135deg, var(--card), var(--card) 6px, var(--surface) 6px, var(--surface) 12px); }
 .cal .unavail { font-size: 11px; color: var(--muted); font-style: italic; }
+/* Fitness */
+.fitness-link { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: inherit; text-decoration: none; }
+.fitness-link:hover { box-shadow: inset 0 0 0 1px #3a3f47; }
+.fitness-link > span:nth-child(2) { flex: 1; min-width: 0; }
+.fitness-arrow { font-size: 24px; color: var(--muted); line-height: 1; }
+.muscles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.muscle { padding: 3px 10px; border-radius: 999px; background: var(--surface); color: var(--fg); font-size: 13px; font-weight: 600; }
+.entries { display: grid; gap: 10px; }
+.entry { grid-template-columns: minmax(160px, 2fr) repeat(3, minmax(70px, 1fr)); align-items: end; }
+@media (max-width: 560px) { .entry { grid-template-columns: repeat(2, minmax(0, 1fr)); } .entry-exercise { grid-column: 1 / -1; } }
+.exercise-item { display: block; }
+.exercise-item summary { cursor: pointer; }
+.exercise-item form { margin-top: 12px; }
+.proposed-exercises { list-style: none; padding: 0; max-height: none; }
+.proposed-exercises li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); }
+.proposed-exercises li > span:first-child { display: grid; min-width: 0; }
+.proposed-exercises .actions { margin: 0; }
 .weight-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-top: 12px; }
 .weight-form .field { flex: 1 1 120px; }
 

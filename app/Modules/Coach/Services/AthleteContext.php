@@ -5,6 +5,8 @@ namespace App\Modules\Coach\Services;
 use App\Models\User;
 use App\Modules\Coach\Models\Conversation;
 use App\Modules\Coach\Models\DailyWellness;
+use App\Modules\Coach\Models\Equipment;
+use App\Modules\Coach\Models\Exercise;
 use App\Modules\Coach\Models\Feedback;
 use App\Modules\Coach\Models\GarminAccount;
 use App\Modules\Coach\Models\Gear;
@@ -20,12 +22,14 @@ use App\Modules\Coach\Models\RunningSession;
 use App\Modules\Coach\Models\StravaAccount;
 use App\Modules\Coach\Models\Unavailability;
 use App\Modules\Coach\Models\WeightEntry;
+use App\Modules\Coach\Models\Workout;
+use App\Modules\Coach\Models\WorkoutSet;
 use Illuminate\Support\Carbon;
 
 /**
  * Fiche à jour de l'athlète, envoyée au coach dans la conversation quand elle a changé :
  * profil (physique, historique, blessures, disponibilités), objectifs, repères calculés, niveau et charge,
- * programme, séances, ressentis, alertes, cycle, mémoire, propositions.
+ * programme, séances, ressentis, fitness (si ouvert), alertes, cycle, mémoire, propositions.
  */
 class AthleteContext
 {
@@ -53,6 +57,7 @@ class AthleteContext
             $this->plan($user),
             $this->sessions($user),
             $this->freeRuns($user),
+            $this->fitness($user, $profile),
             $this->feedbacks($user),
             $this->signals($user),
             $this->missing($user, $profile),
@@ -379,6 +384,48 @@ class AthleteContext
         return $missing ? "## Profil incomplet\nÀ demander au fil de la conversation (sans questionnaire) : ".implode(', ', $missing).'. Les blessures passées sont à demander aussi si rien n\'est renseigné.' : null;
     }
 
+    /** Salle, catalogue et séances de fitness, pour un compte à qui le Fitness est ouvert. */
+    private function fitness(User $user, ?Profile $profile): ?string
+    {
+        if (! $user->hasModuleFeature('coach', 'fitness')) {
+            return null;
+        }
+
+        $lines = ['## Fitness'];
+        $lines[] = '- Objectif : '.(Profile::FITNESS_GOALS[$profile?->fitness_goal] ?? 'non renseigné')
+            .' ; niveau : '.(Profile::FITNESS_LEVELS[$profile?->fitness_level] ?? 'non renseigné')
+            .' ; '.($profile?->fitness_sessions_per_week ? $profile->fitness_sessions_per_week.' séance(s) par semaine' : 'fréquence non renseignée')
+            .' ; '.($profile?->fitness_session_minutes ? $profile->fitness_session_minutes.' min par séance' : 'durée non renseignée');
+
+        $equipment = Equipment::ownedBy($user)->orderBy('name')->get()->groupBy('status');
+        $lines[] = '- Machines disponibles : '.(($equipment['available'] ?? collect())->map(fn (Equipment $item) => $item->name.($item->load_step_kg ? ' (pas de '.WorkoutSet::kg($item->load_step_kg).')' : ''))->implode(', ') ?: 'aucune confirmée pour l\'instant');
+        $lines[] = '- Pas dans sa salle (ne pas proposer) : '.(($equipment['missing'] ?? collect())->pluck('name')->implode(', ') ?: 'rien de noté');
+
+        $exercises = Exercise::ownedBy($user)->with('equipment')->orderBy('name')->get();
+        $lines[] = '- Catalogue d\'exercices ([#id] pour record_workout) : '.($exercises->isEmpty() ? 'vide (commence par propose_exercises)' : '');
+        foreach ($exercises as $exercise) {
+            $lines[] = '  - [#'.$exercise->id.'] '.$exercise->name.' · '.($exercise->equipment?->name ?? 'poids du corps').' · '.mb_strtolower(Exercise::MEASURES[$exercise->measure])
+                .' · '.$exercise->musclesLabel().($exercise->unilateral ? ' · unilatéral' : '');
+        }
+
+        $workouts = Workout::ownedBy($user)->with('sets.exercise')->where('performed_on', '>=', today()->subDays(28))->orderBy('performed_on')->get();
+        $lines[] = '- Séances des 4 dernières semaines : '.($workouts->isEmpty() ? 'aucune' : '');
+        foreach ($workouts as $workout) {
+            $lines[] = '  - [#'.$workout->id.'] '.$workout->summary();
+        }
+
+        $weekSets = $workouts->filter(fn (Workout $workout) => $workout->performed_on->gte(today()->subDays(6)))
+            ->flatMap(fn (Workout $workout) => $workout->sets)
+            ->flatMap(fn (WorkoutSet $set) => $set->exercise->muscles ?? [])
+            ->countBy();
+        if ($weekSets->isNotEmpty()) {
+            $lines[] = '- Séries par muscle sur 7 jours : '.collect(Exercise::MUSCLES)->filter(fn (string $label, string $key) => $weekSets->has($key))
+                ->map(fn (string $label, string $key) => $label.' '.$weekSets[$key])->implode(', ');
+        }
+
+        return implode("\n", $lines);
+    }
+
     private function memory(User $user): string
     {
         $memory = Memory::ownedBy($user)->value('content');
@@ -396,7 +443,13 @@ class AthleteContext
 
         $statuses = ['pending' => 'en attente de réponse', 'accepted' => 'ACCEPTÉE', 'refused' => 'REFUSÉE'];
 
-        return "## Tes propositions récentes\n".$proposals->map(fn (Proposal $proposal) => '- #'.$proposal->id.' ('.($proposal->kind === 'plan' ? 'programme' : 'ajustement').', '.$proposal->created_at->format('d/m').') : '.$proposal->reason.' — '.$statuses[$proposal->status])->implode("\n");
+        $kinds = ['plan' => 'programme', 'adjustment' => 'ajustement', 'exercises' => 'exercices'];
+        $answers = ['have' => 'il l\'a, ajouté', 'missing' => 'machine absente', 'declined' => 'écarté'];
+        // Exercices proposés : la réponse de chacun (sans réponse tant qu'il n'a pas cliqué).
+        $exerciseAnswers = fn (Proposal $proposal) => $proposal->kind !== 'exercises' ? '' : ' ('.collect($proposal->payload['items'] ?? [])
+            ->map(fn (array $item) => $item['name'].' : '.($answers[$item['answer'] ?? ''] ?? 'sans réponse'))->implode(', ').')';
+
+        return "## Tes propositions récentes\n".$proposals->map(fn (Proposal $proposal) => '- #'.$proposal->id.' ('.($kinds[$proposal->kind] ?? $proposal->kind).', '.$proposal->created_at->format('d/m').') : '.$proposal->reason.' — '.$statuses[$proposal->status].$exerciseAnswers($proposal))->implode("\n");
     }
 
     private function conversation(Conversation $conversation): string

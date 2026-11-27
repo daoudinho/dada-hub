@@ -44,6 +44,7 @@ class ProfileController extends Controller
             'googleHealth' => GoogleHealthAccount::ownedBy($user)->first(),
             'syncAccount' => SyncAccount::ownedBy($user)->first(),
             'gear' => Gear::ownedBy($user)->where('retired', false)->orderByDesc('primary')->get(),
+            'fitness' => $user->hasModuleFeature('coach', 'fitness'),
             'cycleEntries' => $profile->tracksCycle() ? CycleEntry::ownedBy($user)->orderByDesc('started_on')->limit(12)->get() : collect(),
         ]);
     }
@@ -67,6 +68,10 @@ class ProfileController extends Controller
             'availability_notes' => ['nullable', 'string', 'max:1500'],
             'cycle_tracking' => ['nullable', 'boolean'],
             'hormonal_contraception' => ['nullable', 'boolean'],
+            'fitness_goal' => ['nullable', Rule::in(array_keys(Profile::FITNESS_GOALS))],
+            'fitness_level' => ['nullable', Rule::in(array_keys(Profile::FITNESS_LEVELS))],
+            'fitness_sessions_per_week' => ['nullable', 'integer', 'between:1,7'],
+            'fitness_session_minutes' => ['nullable', 'integer', 'between:15,240'],
         ]);
 
         $availability = collect(Profile::DAYS)->map(fn (string $label, string $day) => [
@@ -84,7 +89,14 @@ class ProfileController extends Controller
             // Le suivi du cycle ne concerne que les femmes.
             'cycle_tracking' => $isFemale && $request->boolean('cycle_tracking'),
             'hormonal_contraception' => $isFemale && $request->boolean('hormonal_contraception'),
-        ])->save();
+        ]);
+        // Section Fitness affichée seulement quand le sous-module est ouvert : sinon on ne touche pas à ses valeurs.
+        if ($request->user()->hasModuleFeature('coach', 'fitness')) {
+            $profile->fill(collect($data)->only(['fitness_goal', 'fitness_level', 'fitness_sessions_per_week', 'fitness_session_minutes'])->all() + [
+                'fitness_goal' => null, 'fitness_level' => null, 'fitness_sessions_per_week' => null, 'fitness_session_minutes' => null,
+            ]);
+        }
+        $profile->save();
 
         return to_route('coach.profile.edit')->with('status', 'Profil enregistré.');
     }

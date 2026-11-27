@@ -10,6 +10,7 @@
       'trophy' => '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
       'user' => '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
       'info' => '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      'dumbbell' => '<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>',
       'run' => '<circle cx="15" cy="4.5" r="1.8"/><path d="M8 21l3-6 3 2.5V22M6 12l3-3.5 4 1.5 2.5 3H19M11 15l-1.5-4"/>',
   ];
 @endphp
