@@ -151,6 +151,15 @@ a.tile:hover { border-color: #3a3f47; }
 .exploit-group { margin-bottom: 20px; }
 .exploit-group h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .exploit-group h2 strong { color: var(--brand); }
+.versus-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 4px 0 14px; font-weight: 600; }
+.versus-score span:last-child { text-align: right; }
+.versus-score strong { font-size: 24px; color: var(--brand); }
+.versus-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.versus-list li { display: grid; grid-template-columns: 1fr 88px 88px; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border-radius: 12px; }
+.versus-list .versus-head { background: none; padding-block: 0; font-size: 13px; }
+.versus-label small { display: block; }
+.versus-value { text-align: right; color: var(--muted); }
+.versus-value.win { color: var(--brand); font-weight: 700; }
 .records { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .records a { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 12px; background: var(--surface); border-radius: 12px; color: inherit; text-decoration: none; }
 .records a:hover { background: #22262c; }

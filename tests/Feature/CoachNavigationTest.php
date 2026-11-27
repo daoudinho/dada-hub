@@ -112,6 +112,27 @@ class CoachNavigationTest extends TestCase
         $this->actingAs($runner)->get('/coach')->assertSee('Exploits')->assertSee('19,8 km/h');
     }
 
+    public function test_versus_compares_each_record_with_the_other_runner_with_the_winner_and_the_gap(): void
+    {
+        $runner = User::factory()->withModules('coach')->withFeatures(['coach' => ['running']])->create(['name' => 'Daoud']);
+        $rival = User::factory()->withModules('coach')->withFeatures(['coach' => ['running']])->create(['name' => 'Sarah']);
+        User::factory()->withModules('coach')->withFeatures(['coach' => ['fitness']])->create(['name' => 'Karim']);
+        $mine = RunningActivity::factory()->for($runner)->create(['started_at' => '2026-01-05 08:00', 'distance_m' => 18000]);
+        $theirs = RunningActivity::factory()->for($rival)->create(['started_at' => '2026-01-05 08:00', 'distance_m' => 12000, 'analysis' => ['top_speed' => 5.0]]);
+        foreach ([[$mine, 1500], [$theirs, 1451]] as [$run, $seconds]) {
+            (new BestEffort(['activity_id' => $run->id, 'name' => '5K', 'distance_m' => 5000, 'elapsed_seconds' => $seconds, 'achieved_on' => today()]))
+                ->user()->associate($run->user_id)->save();
+        }
+
+        $this->actingAs($runner)->get('/coach/exploits')->assertOk()
+            ->assertSeeInOrder(['Versus', 'Toi', '2 – 2', 'Sarah',
+                'Plus longue course', 'Tu gagnes de 6,00 km', '18,00 km', '12,00 km',
+                'Semaine la plus prolifique', 'Tu gagnes de 6,0 km',
+                'Meilleur 5 kilomètres', 'Sarah gagne de 0:49', '25:00', '24:11',
+                'Vitesse de pointe', 'Pas encore de record pour toi', '—', '18,0 km/h'])
+            ->assertDontSee('Karim');
+    }
+
     public function test_most_prolific_week_shows_its_total_distance_and_sessions(): void
     {
         $runner = User::factory()->withModules('coach')->withFeatures(['coach' => ['running']])->create();

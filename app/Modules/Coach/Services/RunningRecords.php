@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Coach\Models\BestEffort;
 use App\Modules\Coach\Models\RunningActivity;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Records de course (« exploits ») : meilleurs temps sur une distance et vitesse de pointe, calculés à partir
@@ -133,6 +134,57 @@ class RunningRecords
     }
 
     /**
+     * Duel des records de l'athlète avec chaque autre coureur du hub (sous-module Running) : pour chaque record détenu par
+     * l'un des deux, les deux valeurs, le gagnant et l'écart.
+     *
+     * @return list<array{rival: User, wins: int, losses: int, rows: list<array{key: string, label: string, mine: ?string, theirs: ?string, winner: ?string, gap: ?string}>}>
+     */
+    public function versus(User $user): array
+    {
+        $runners = DB::table('module_feature_user')->where('module', 'coach')->where('feature', 'running')->select('user_id');
+        $rivals = User::whereKeyNot($user->id)->whereIn('id', $runners)->orderBy('name')->get();
+        if ($rivals->isEmpty()) {
+            return [];
+        }
+
+        $mine = $this->holders($user);
+
+        return $rivals->map(function (User $rival) use ($mine) {
+            $theirs = $this->holders($rival);
+            $rows = collect(self::LABELS)
+                ->filter(fn (string $label, string $key) => isset($mine[$key]) || isset($theirs[$key]))
+                ->map(function (string $label, string $key) use ($mine, $theirs) {
+                    [$me, $them] = [$mine[$key]['score'] ?? null, $theirs[$key]['score'] ?? null];
+                    $winner = match (true) {
+                        $me === null => 'rival',
+                        $them === null => 'me',
+                        $me == $them => 'tie',
+                        // Meilleurs temps : le plus court gagne ; ailleurs, le plus grand.
+                        isset(self::DISTANCES[$key]) => $me < $them ? 'me' : 'rival',
+                        default => $me > $them ? 'me' : 'rival',
+                    };
+
+                    return ['key' => $key, 'label' => $label, 'mine' => $mine[$key]['value'] ?? null, 'theirs' => $theirs[$key]['value'] ?? null,
+                        'winner' => $winner, 'gap' => $me !== null && $them !== null && $winner !== 'tie' ? self::gap($key, abs($me - $them)) : null];
+                })
+                ->values();
+
+            return ['rival' => $rival, 'wins' => $rows->where('winner', 'me')->count(), 'losses' => $rows->where('winner', 'rival')->count(), 'rows' => $rows->all()];
+        })->all();
+    }
+
+    /** Écart entre deux scores d'un record, dans son unité : « 2,35 km », « 0:49 », « 1,2 km/h ». */
+    private static function gap(string $key, float $difference): string
+    {
+        return match (true) {
+            $key === 'longest' => number_format($difference / 1000, 2, ',', ' ').' km',
+            $key === 'best_week' => number_format($difference, 1, ',', ' ').' km',
+            $key === 'top_speed' => number_format($difference * 3.6, 1, ',', '').' km/h',
+            default => Duration::format((int) round($difference)),
+        };
+    }
+
+    /**
      * Compare une nouvelle course aux records : ceux qu'elle bat sont notés sur la course (avec l'ancienne valeur).
      * Une première performance (sans record précédent) n'est pas un « nouveau record ».
      *
@@ -161,7 +213,9 @@ class RunningRecords
     /**
      * Détenteur de chaque record, dans l'ordre d'affichage (records absents omis), éventuellement sans une course.
      *
-     * @return array<string, array{value: string, detail: string, activity: ?RunningActivity, week?: array{start: Carbon, end: Carbon, km: float, sessions: int}}>
+     * Le score sert aux comparaisons : mètres (plus longue course), km (semaine), secondes (meilleurs temps), m/s (vitesse).
+     *
+     * @return array<string, array{value: string, detail: string, activity: ?RunningActivity, score: float, week?: array{start: Carbon, end: Carbon, km: float, sessions: int}}>
      */
     private function holders(User $user, ?int $exceptActivityId = null): array
     {
@@ -171,7 +225,8 @@ class RunningRecords
 
         $longest = (clone $runs)->orderByDesc('distance_m')->first();
         if ($longest && $longest->distance_m > 0) {
-            $records['longest'] = ['value' => number_format($longest->distanceKm(), 2, ',', ' ').' km', 'detail' => 'en '.Duration::format($longest->moving_seconds), 'activity' => $longest];
+            $records['longest'] = ['value' => number_format($longest->distanceKm(), 2, ',', ' ').' km', 'detail' => 'en '.Duration::format($longest->moving_seconds), 'activity' => $longest,
+                'score' => (float) $longest->distance_m];
         }
 
         // Semaine (lundi → dimanche) au plus grand kilométrage.
@@ -183,7 +238,7 @@ class RunningRecords
             ->first();
         if ($week && $week['km'] > 0) {
             $records['best_week'] = ['value' => number_format($week['km'], 1, ',', ' ').' km', 'detail' => $week['sessions'].' séance'.($week['sessions'] > 1 ? 's' : ''),
-                'activity' => null, 'week' => $week];
+                'activity' => null, 'week' => $week, 'score' => (float) $week['km']];
         }
 
         $efforts = BestEffort::ownedBy($user)->with(['activity' => fn ($query) => $query->summary()])->whereIn('name', array_keys(self::DISTANCES))
@@ -194,7 +249,8 @@ class RunningRecords
             ->map(fn ($group) => $group->sortBy('elapsed_seconds')->first());
         foreach (array_keys(self::DISTANCES) as $name) {
             if ($effort = $efforts->get($name)) {
-                $records[$name] = ['value' => Duration::format($effort->elapsed_seconds), 'detail' => Duration::pace($effort->elapsed_seconds, $effort->distance_m) ?? '', 'activity' => $effort->activity];
+                $records[$name] = ['value' => Duration::format($effort->elapsed_seconds), 'detail' => Duration::pace($effort->elapsed_seconds, $effort->distance_m) ?? '', 'activity' => $effort->activity,
+                    'score' => (float) $effort->elapsed_seconds];
             }
         }
 
@@ -204,7 +260,8 @@ class RunningRecords
             ->first();
         if ($fastest) {
             $speed = $fastest->analysis['top_speed'];
-            $records['top_speed'] = ['value' => number_format($speed * 3.6, 1, ',', '').' km/h', 'detail' => 'soit '.Duration::format((int) round(1000 / $speed)).' /km', 'activity' => $fastest];
+            $records['top_speed'] = ['value' => number_format($speed * 3.6, 1, ',', '').' km/h', 'detail' => 'soit '.Duration::format((int) round(1000 / $speed)).' /km', 'activity' => $fastest,
+                'score' => (float) $speed];
         }
 
         return collect(self::LABELS)->keys()->filter(fn (string $key) => isset($records[$key]))->mapWithKeys(fn (string $key) => [$key => $records[$key]])->all();
