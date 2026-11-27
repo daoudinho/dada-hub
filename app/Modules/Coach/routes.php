@@ -23,6 +23,7 @@ use App\Modules\Coach\Http\Controllers\Running\AfterRunController;
 use App\Modules\Coach\Http\Controllers\Running\CalendarController;
 use App\Modules\Coach\Http\Controllers\Running\SessionController;
 use App\Modules\Coach\Http\Controllers\StravaController;
+use App\Modules\Coach\Http\Controllers\SyncAccountController;
 use App\Modules\Coach\Http\Controllers\WeightController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +57,10 @@ Route::get('google-health/connexion', [GoogleHealthController::class, 'connect']
 Route::get('google-health/retour', [GoogleHealthController::class, 'callback'])->name('google-health.callback');
 Route::post('google-health/synchroniser', [GoogleHealthController::class, 'sync'])->middleware('throttle:6,1')->name('google-health.sync');
 Route::delete('google-health', [GoogleHealthController::class, 'disconnect'])->name('google-health.disconnect');
+
+Route::post('dada-sync', [SyncAccountController::class, 'store'])->name('sync.store');
+Route::delete('dada-sync', [SyncAccountController::class, 'destroy'])->name('sync.destroy');
+// L'API de l'app (clé personnelle, sans session) est déclarée dans CoachModule.
 
 Route::post('objectifs', [GoalController::class, 'store'])->name('goals.store');
 Route::patch('objectifs/{goal}', [GoalController::class, 'update'])->name('goals.update');

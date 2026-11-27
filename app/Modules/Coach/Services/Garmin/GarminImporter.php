@@ -9,6 +9,7 @@ use App\Modules\Coach\Models\Profile;
 use App\Modules\Coach\Models\RunningActivity;
 use App\Modules\Coach\Services\CoachConversation;
 use App\Modules\Coach\Services\ReferencePaces;
+use App\Modules\Coach\Services\RouteStreams;
 use App\Modules\Coach\Services\RunningRecords;
 use App\Modules\Coach\Services\SessionMatcher;
 use App\Modules\Coach\Services\Strava\ActivityAnalysis;
@@ -24,9 +25,6 @@ class GarminImporter
 {
     /** Nombre maximal de mesures demandées par course (environ 2 h 45 à une mesure par seconde). */
     private const MAX_CHART_SIZE = 10000;
-
-    /** Points gardés pour le tracé GPS. */
-    private const POLYLINE_POINTS = 600;
 
     /** Meilleurs temps fournis par Garmin → noms utilisés par l'application. */
     private const BEST_EFFORTS = ['fastestSplit_1000' => ['1K', 1000], 'fastestSplit_5000' => ['5K', 5000], 'fastestSplit_10000' => ['10K', 10000]];
@@ -75,7 +73,7 @@ class GarminImporter
         $id = (string) $summary['activityId'];
         $startedAt = Carbon::parse($summary['startTimeLocal']);
         $streams = $this->streams($account, $id);
-        $laps = $this->kilometreLaps($streams);
+        $laps = RouteStreams::kilometreLaps($streams);
         $existing = RunningActivity::ownedBy($user)->where('source', 'garmin')->where('external_id', $id)->first();
 
         return DB::transaction(function () use ($user, $summary, $id, $startedAt, $streams, $laps, $existing, $notify) {
@@ -97,7 +95,7 @@ class GarminImporter
                 'elevation_gain_m' => isset($summary['elevationGain']) ? (int) round($summary['elevationGain']) : null,
                 'laps' => $laps ?: null,
                 'streams' => collect($streams)->except(['latitude', 'longitude'])->all() ?: null,
-                'polyline' => $this->polyline($streams) ?: null,
+                'polyline' => RouteStreams::polyline($streams) ?: null,
                 'dynamics' => $this->dynamics($summary) ?: null,
                 'raw_summary' => $summary,
             ]);
@@ -228,92 +226,6 @@ class GarminImporter
             'latitude' => $column('directLatitude'),
             'longitude' => $column('directLongitude'),
         ], fn ($values) => $values !== null);
-    }
-
-    /**
-     * Tours de 1 km calculés à partir des courbes (dernier tour partiel gardé s'il fait au moins 100 m).
-     *
-     * @param  array<string, list<float|int|bool|null>>  $streams
-     * @return list<array{distance_m: int, moving_s: int, avg_speed: float, avg_hr: ?int, max_hr: ?int}>
-     */
-    private function kilometreLaps(array $streams): array
-    {
-        $time = $streams['time'] ?? [];
-        $distance = $streams['distance'] ?? [];
-        if (count($time) < 2 || count($distance) !== count($time)) {
-            return [];
-        }
-
-        $laps = [];
-        $lap = ['start' => 0.0, 'moving' => 0, 'hr' => 0.0, 'hr_time' => 0, 'max_hr' => null];
-        for ($i = 1; $i < count($time); $i++) {
-            $dt = $time[$i] - $time[$i - 1];
-            if ($dt <= 0 || $distance[$i] === null) {
-                continue;
-            }
-            if (($streams['moving'][$i] ?? true) && $dt <= RunningRecords::PAUSE_SECONDS) {
-                $lap['moving'] += $dt;
-            }
-            if (! empty($streams['heartrate'][$i])) {
-                $lap['hr'] += $streams['heartrate'][$i] * $dt;
-                $lap['hr_time'] += $dt;
-                $lap['max_hr'] = max($lap['max_hr'] ?? 0, (int) $streams['heartrate'][$i]);
-            }
-            if ($distance[$i] - $lap['start'] >= 1000) {
-                $laps[] = $this->closeLap($lap, $distance[$i] - $lap['start']);
-                $lap = ['start' => (float) $distance[$i], 'moving' => 0, 'hr' => 0.0, 'hr_time' => 0, 'max_hr' => null];
-            }
-        }
-        $rest = (float) end($distance) - $lap['start'];
-        if ($rest >= 100 && $lap['moving'] > 0) {
-            $laps[] = $this->closeLap($lap, $rest);
-        }
-
-        return $laps;
-    }
-
-    /**
-     * @param  array{start: float, moving: int, hr: float, hr_time: int, max_hr: ?int}  $lap
-     * @return array{distance_m: int, moving_s: int, avg_speed: float, avg_hr: ?int, max_hr: ?int}
-     */
-    private function closeLap(array $lap, float $meters): array
-    {
-        return [
-            'distance_m' => (int) round($meters),
-            'moving_s' => $lap['moving'],
-            'avg_speed' => $lap['moving'] > 0 ? round($meters / $lap['moving'], 3) : 0.0,
-            'avg_hr' => $lap['hr_time'] > 0 ? (int) round($lap['hr'] / $lap['hr_time']) : null,
-            'max_hr' => $lap['max_hr'],
-        ];
-    }
-
-    /**
-     * Tracé GPS simplifié (au plus 600 points).
-     *
-     * @param  array<string, list<float|int|bool|null>>  $streams
-     * @return list<array{0: float, 1: float}>
-     */
-    private function polyline(array $streams): array
-    {
-        $points = [];
-        foreach ($streams['latitude'] ?? [] as $i => $latitude) {
-            $longitude = $streams['longitude'][$i] ?? null;
-            if ($latitude !== null && $longitude !== null && ($latitude != 0 || $longitude != 0)) {
-                $points[] = [round((float) $latitude, 5), round((float) $longitude, 5)];
-            }
-        }
-        if (count($points) <= self::POLYLINE_POINTS) {
-            return $points;
-        }
-
-        $step = count($points) / self::POLYLINE_POINTS;
-        $simplified = [];
-        for ($i = 0; $i < self::POLYLINE_POINTS; $i++) {
-            $simplified[] = $points[(int) floor($i * $step)];
-        }
-        $simplified[] = end($points);
-
-        return $simplified;
     }
 
     /**

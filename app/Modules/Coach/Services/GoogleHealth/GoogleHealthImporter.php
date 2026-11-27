@@ -80,6 +80,14 @@ class GoogleHealthImporter
         $metrics = $exercise['metricsSummary'] ?? [];
         $id = self::externalId($point);
         $startedAt = self::localTime($exercise['interval']['startTime'], $exercise['interval']['startUtcOffset'] ?? null);
+
+        // Course reçue ou complétée par Dada Sync (lue directement dans Samsung Health, plus riche) : on n'y touche plus,
+        // et on ne la duplique pas.
+        $fromDevice = RunningActivity::ownedBy($user)->whereNotNull('device_synced_at')
+            ->whereBetween('started_at', [$startedAt->copy()->subMinutes(2), $startedAt->copy()->addMinutes(2)])->first();
+        if ($fromDevice) {
+            return $fromDevice;
+        }
         $endedAt = self::localTime($exercise['interval']['endTime'], $exercise['interval']['endUtcOffset'] ?? null);
         $movingSeconds = max(60, (int) round(self::seconds($exercise['activeDuration'] ?? null) ?? $startedAt->diffInSeconds($endedAt)));
         $streams = $this->heartRateStream($account, $exercise['interval']['startTime'], $exercise['interval']['endTime']);

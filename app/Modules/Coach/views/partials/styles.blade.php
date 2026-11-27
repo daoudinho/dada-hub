@@ -293,6 +293,7 @@ dialog h2 { margin-top: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .suggest { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--brand-soft); }
 .suggest p { margin: 0 0 8px; }
+.token { display: inline-block; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: 14px; word-break: break-all; user-select: all; }
 .suggest .actions { display: flex; gap: 8px; margin: 0; }
 .after-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 12px; padding: 0; list-style: none; font-size: 13px; }
 .after-steps li { padding: 3px 10px; border-radius: 999px; background: var(--surface); color: var(--muted); }
