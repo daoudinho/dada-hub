@@ -19,11 +19,11 @@ class StravaExportController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'export' => ['required', 'file', 'mimes:zip', 'max:12288'],
+            'export' => ['required', 'file', 'mimes:zip', 'max:102400'],
         ], [
             'export.required' => 'Choisis le fichier .zip de ton export Strava.',
             'export.mimes' => 'L\'export Strava doit être le fichier .zip téléchargé depuis Strava.',
-            'export.max' => 'L\'export dépasse 12 Mo.',
+            'export.max' => 'L\'export dépasse 100 Mo.',
         ]);
 
         try {

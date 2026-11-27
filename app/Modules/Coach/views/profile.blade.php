@@ -339,7 +339,7 @@
     @elseif (($stravaExport['state'] ?? null) === 'failed')
       <p class="errors">Le dernier import a échoué : {{ $stravaExport['error'] }}</p>
     @endif
-    <p class="muted small">Sur strava.com : Paramètres → Mon compte → Télécharger ou supprimer votre compte → « Demander une archive ». Envoie ici le .zip reçu par e-mail (12 Mo au plus) : tes courses arrivent avec leur tracé et leur fréquence cardiaque, sans débrief. Une course déjà présente à la même heure (Garmin, Dada Sync) est complétée, pas dupliquée.</p>
+    <p class="muted small">Sur strava.com : Paramètres → Mon compte → Télécharger ou supprimer votre compte → « Demander une archive ». Envoie ici le .zip reçu par e-mail (100 Mo au plus) : tes courses arrivent avec leur tracé et leur fréquence cardiaque, sans débrief. Une course déjà présente à la même heure (Garmin, Dada Sync) est complétée, pas dupliquée.</p>
     <form method="POST" action="{{ route('coach.strava.export') }}" enctype="multipart/form-data" class="actions">
       @csrf
       <input type="file" name="export" accept=".zip,application/zip" required aria-label="Export Strava (.zip)">

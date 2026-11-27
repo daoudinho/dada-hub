@@ -64,8 +64,8 @@ RUN { \
     echo "memory_limit=256M"; \
     echo "max_execution_time=120"; \
     echo "max_input_time=120"; \
-    echo "upload_max_filesize=12M"; \
-    echo "post_max_size=14M"; \
+    echo "upload_max_filesize=100M"; \
+    echo "post_max_size=105M"; \
     } > /usr/local/etc/php/conf.d/app.ini
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
