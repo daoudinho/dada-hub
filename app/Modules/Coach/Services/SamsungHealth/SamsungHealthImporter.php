@@ -22,8 +22,10 @@ use Illuminate\Support\Facades\DB;
  * remplace l'ancienne.
  *
  * Format d'une course : {id, type, title?, start, end (ISO 8601 avec décalage), duration_s?, distance_m?, mean_hr?, max_hr?,
- * mean_cadence?, elevation_gain_m?, route?: [[secondes depuis le départ, latitude, longitude, altitude?]…],
+ * mean_cadence?, elevation_gain_m?, notes?, rpe?, route?: [[secondes depuis le départ, latitude, longitude, altitude?]…],
  * samples?: [[secondes depuis le départ, fc?, vitesse m/s?, cadence?]…]}
+ *
+ * Le même format sert à l'historique d'un export Strava (StravaExport), importé sous la source « strava ».
  */
 class SamsungHealthImporter
 {
@@ -52,40 +54,47 @@ class SamsungHealthImporter
      * Importe une course (créée, complétée ou mise à jour).
      *
      * @param  array<string, mixed>  $run  course validée par l'API
+     * @param  string  $source  source enregistrée sur une nouvelle course (« strava » pour un export Strava)
      * @return array{activity: RunningActivity, status: 'created'|'merged'|'updated'}
      */
-    public function import(User $user, array $run, bool $notify = true): array
+    public function import(User $user, array $run, bool $notify = true, string $source = self::SOURCE): array
     {
         $startedAt = self::localTime($run['start']);
         $endedAt = self::localTime($run['end']);
         $streams = $this->streams($run['route'] ?? [], $run['samples'] ?? []);
         $measures = $this->measures($run, $streams, $startedAt, $endedAt);
+        $details = array_filter([
+            'name' => filled($run['title'] ?? null) ? mb_substr($run['title'], 0, 150) : null,
+            'notes' => filled($run['notes'] ?? null) ? mb_substr($run['notes'], 0, 2000) : null,
+            'rpe' => isset($run['rpe']) ? (int) $run['rpe'] : null,
+        ], fn ($value) => $value !== null);
 
-        $own = RunningActivity::ownedBy($user)->where('source', self::SOURCE)->where('external_id', (string) $run['id'])->first();
+        $own = RunningActivity::ownedBy($user)->where('source', $source)->where('external_id', (string) $run['id'])->first();
         $other = $own ? null : RunningActivity::ownedBy($user)
             ->whereBetween('started_at', [$startedAt->copy()->subSeconds(self::SAME_RUN_SECONDS), $startedAt->copy()->addSeconds(self::SAME_RUN_SECONDS)])
             ->get()
             ->sortBy(fn (RunningActivity $activity) => abs($activity->started_at->diffInSeconds($startedAt, false)))
             ->first();
 
-        return DB::transaction(function () use ($user, $run, $startedAt, $measures, $own, $other, $notify) {
+        return DB::transaction(function () use ($user, $run, $startedAt, $measures, $details, $own, $other, $notify, $source) {
             if ($other) {
-                $this->complete($other, $measures);
+                $this->complete($other, $measures + $details);
                 $status = 'merged';
                 $activity = $other;
                 $session = $activity->session;
             } else {
                 [$session, $suggestedId] = SessionMatcher::forImport($user, $startedAt, $own, $notify);
-                $activity = $own ?? (new RunningActivity(['source' => self::SOURCE, 'external_id' => mb_substr((string) $run['id'], 0, 100)]))->user()->associate($user);
-                $activity->fill($measures + [
+                $activity = $own ?? (new RunningActivity(['source' => $source, 'external_id' => mb_substr((string) $run['id'], 0, 100)]))->user()->associate($user);
+                $activity->fill($measures + $details + [
                     'session_id' => $session?->id,
                     'suggested_session_id' => $suggestedId,
-                    'name' => filled($run['title'] ?? null) ? mb_substr($run['title'], 0, 150) : null,
                 ]);
                 $status = $own ? 'updated' : 'created';
             }
 
-            $activity->device_synced_at = now();
+            if ($source === self::SOURCE) {
+                $activity->device_synced_at = now();
+            }
             $activity->analysis = $this->analysis->analyzeActivity($activity, $session, $this->referencePaces->zonesFor($user));
             $activity->save();
 
@@ -110,7 +119,7 @@ class SamsungHealthImporter
      */
     private function complete(RunningActivity $activity, array $measures): void
     {
-        foreach (['distance_m', 'moving_seconds', 'elapsed_seconds', 'avg_hr', 'max_hr', 'avg_cadence', 'elevation_gain_m', 'sport_type'] as $field) {
+        foreach (['distance_m', 'moving_seconds', 'elapsed_seconds', 'avg_hr', 'max_hr', 'avg_cadence', 'elevation_gain_m', 'sport_type', 'name', 'notes', 'rpe'] as $field) {
             if (blank($activity->{$field}) && filled($measures[$field] ?? null)) {
                 $activity->{$field} = $measures[$field];
             }

@@ -328,6 +328,25 @@
     <p class="muted">Relie ton compte pour que chaque course arrive automatiquement chez ton coach, avec la fréquence cardiaque, les allures et les tours.</p>
     <a class="btn strava" href="{{ route('coach.strava.connect') }}">Relier Strava</a>
   @endif
+
+  <h3>Importer ton historique Strava</h3>
+  @if (($stravaExport['state'] ?? null) === 'running')
+    <p class="small">Import en cours : {{ $stravaExport['done'] }} / {{ $stravaExport['total'] }} courses. Recharge la page dans quelques minutes.</p>
+  @else
+    @if (($stravaExport['state'] ?? null) === 'done')
+      <p class="small">Dernier import ({{ \Illuminate\Support\Carbon::parse($stravaExport['at'])->locale('fr')->diffForHumans() }}) :
+        {{ $stravaExport['created'] }} course(s) ajoutée(s), {{ $stravaExport['merged'] }} complétée(s) (déjà présentes), {{ $stravaExport['updated'] }} mise(s) à jour.</p>
+    @elseif (($stravaExport['state'] ?? null) === 'failed')
+      <p class="errors">Le dernier import a échoué : {{ $stravaExport['error'] }}</p>
+    @endif
+    <p class="muted small">Sur strava.com : Paramètres → Mon compte → Télécharger ou supprimer votre compte → « Demander une archive ». Envoie ici le .zip reçu par e-mail (12 Mo au plus) : tes courses arrivent avec leur tracé et leur fréquence cardiaque, sans débrief. Une course déjà présente à la même heure (Garmin, Dada Sync) est complétée, pas dupliquée.</p>
+    <form method="POST" action="{{ route('coach.strava.export') }}" enctype="multipart/form-data" class="actions">
+      @csrf
+      <input type="file" name="export" accept=".zip,application/zip" required aria-label="Export Strava (.zip)">
+      <button class="btn ghost small">Importer</button>
+    </form>
+    @error('export')<p class="errors">{{ $message }}</p>@enderror
+  @endif
 </section>
 
 {{-- Google Health --}}
