@@ -306,6 +306,37 @@
 </section>
 
 {{-- Google Health --}}
+<section class="card section" id="dada-sync">
+  <h2>Dada Sync <span class="pill">app Android</span></h2>
+  @if (session('sync_token'))
+    <div class="suggest">
+      <p><strong>Ta clé Dada Sync</strong> : copie-la dans l'app maintenant, elle ne sera plus affichée.</p>
+      <p><code class="token">{{ session('sync_token') }}</code></p>
+      <p class="small">Adresse du hub à saisir dans l'app : <code>{{ url('/') }}</code></p>
+    </div>
+  @endif
+  @if ($syncAccount)
+    <p>Clé active <span class="muted small">(…{{ $syncAccount->token_hint }}, créée le {{ $syncAccount->created_at->format('d/m/Y') }})</span>.</p>
+    <p class="muted small">
+      @if ($syncAccount->last_synced_at)
+        Dernier envoi {{ $syncAccount->last_synced_at->locale('fr')->diffForHumans() }} ({{ $syncAccount->last_sync_runs }} course{{ $syncAccount->last_sync_runs > 1 ? 's' : '' }}).
+      @elseif ($syncAccount->last_seen_at)
+        L'app est reliée ({{ $syncAccount->last_seen_at->locale('fr')->diffForHumans() }}), aucune course envoyée pour l'instant.
+      @else
+        En attente de la première connexion de l'app.
+      @endif
+      @if ($syncAccount->app_version) · version {{ $syncAccount->app_version }}@endif
+    </p>
+    <div class="actions">
+      <form method="POST" action="{{ route('coach.sync.store') }}" class="inline" onsubmit="return confirm('Créer une nouvelle clé ? L\'ancienne cessera de fonctionner.')">@csrf<button class="btn ghost small">Nouvelle clé</button></form>
+      <form method="POST" action="{{ route('coach.sync.destroy') }}" class="inline" onsubmit="return confirm('Révoquer la clé ? L\'app ne pourra plus envoyer de courses.')">@csrf @method('DELETE')<button class="btn danger small">Révoquer</button></form>
+    </div>
+  @else
+    <p class="muted">L'app Dada Sync lit tes courses directement dans Samsung Health sur ton téléphone (tracé, fréquence cardiaque) et les envoie ici, sans passer par Google. Crée une clé, puis colle-la dans l'app.</p>
+    <form method="POST" action="{{ route('coach.sync.store') }}">@csrf<button class="btn">Créer ma clé Dada Sync</button></form>
+  @endif
+</section>
+
 <section class="card section" id="google-health">
   <h2>Google Health</h2>
   @if ($googleHealth)

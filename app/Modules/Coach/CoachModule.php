@@ -6,6 +6,8 @@ use App\Modules\Coach\Console\ReanalyzeActivitiesCommand;
 use App\Modules\Coach\Console\RecomputeRecordsCommand;
 use App\Modules\Coach\Console\StravaWebhookCommand;
 use App\Modules\Coach\Http\Controllers\StravaWebhookController;
+use App\Modules\Coach\Http\Controllers\SyncApiController;
+use App\Modules\Coach\Http\Middleware\AuthenticateSyncAccount;
 use App\Modules\Coach\Http\Middleware\SyncConnectedAccounts;
 use App\Modules\Coach\Models\Conversation;
 use App\Modules\Coach\Models\CycleEntry;
@@ -76,6 +78,12 @@ class CoachModule extends Module
             Route::prefix('coach/strava/webhook')->name('coach.strava.webhook.')->middleware('throttle:120,1')->group(function () {
                 Route::get('/', [StravaWebhookController::class, 'verify'])->name('verify');
                 Route::post('/', [StravaWebhookController::class, 'handle'])->name('handle');
+            });
+
+            // API de l'app Android Dada Sync : sans session ni jeton CSRF, la clé personnelle de l'athlète fait foi.
+            Route::prefix('api/coach/sync')->name('coach.sync.api.')->middleware(['throttle:60,1', AuthenticateSyncAccount::class])->group(function () {
+                Route::get('etat', [SyncApiController::class, 'status'])->name('status');
+                Route::post('courses', [SyncApiController::class, 'runs'])->name('runs');
             });
         }
 

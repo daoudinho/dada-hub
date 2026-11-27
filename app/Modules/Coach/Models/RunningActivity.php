@@ -37,10 +37,11 @@ class RunningActivity extends Model
 
     protected $fillable = ['session_id', 'source', 'external_id', 'name', 'started_at', 'distance_m', 'moving_seconds', 'elapsed_seconds',
         'avg_hr', 'max_hr', 'avg_cadence', 'elevation_gain_m', 'laps', 'streams', 'rpe', 'notes', 'sport_type', 'gear_id', 'analysis',
-        'raw_summary', 'dynamics', 'polyline', 'review', 'suggested_session_id', 'new_records'];
+        'raw_summary', 'dynamics', 'polyline', 'review', 'suggested_session_id', 'new_records', 'device_synced_at'];
 
     protected $casts = [
         'started_at' => 'datetime',
+        'device_synced_at' => 'datetime',
         'distance_m' => 'integer',
         'moving_seconds' => 'integer',
         'elapsed_seconds' => 'integer',
@@ -92,7 +93,8 @@ class RunningActivity extends Model
     /** Montre ou application reliée : les courses arrivent seules. */
     public static function syncedFor(User $user): bool
     {
-        return GarminAccount::ownedBy($user)->exists() || StravaAccount::ownedBy($user)->exists() || GoogleHealthAccount::ownedBy($user)->exists();
+        return GarminAccount::ownedBy($user)->exists() || StravaAccount::ownedBy($user)->exists() || GoogleHealthAccount::ownedBy($user)->exists()
+            || SyncAccount::ownedBy($user)->exists();
     }
 
     public function debriefTitle(): string
@@ -124,6 +126,7 @@ class RunningActivity extends Model
             'garmin' => 'Garmin',
             'strava' => 'Strava',
             'google_health' => 'Google Health',
+            'samsung_health' => 'Samsung Health',
             default => 'Saisie',
         };
     }

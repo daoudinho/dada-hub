@@ -12,6 +12,7 @@ use App\Modules\Coach\Models\Injury;
 use App\Modules\Coach\Models\PastRace;
 use App\Modules\Coach\Models\Profile;
 use App\Modules\Coach\Models\StravaAccount;
+use App\Modules\Coach\Models\SyncAccount;
 use App\Modules\Coach\Models\Unavailability;
 use App\Modules\Coach\Services\CycleTracker;
 use App\Modules\Coach\Services\ReferencePaces;
@@ -41,6 +42,7 @@ class ProfileController extends Controller
             'garmin' => GarminAccount::ownedBy($user)->first(),
             'strava' => StravaAccount::ownedBy($user)->first(),
             'googleHealth' => GoogleHealthAccount::ownedBy($user)->first(),
+            'syncAccount' => SyncAccount::ownedBy($user)->first(),
             'gear' => Gear::ownedBy($user)->where('retired', false)->orderByDesc('primary')->get(),
             'cycleEntries' => $profile->tracksCycle() ? CycleEntry::ownedBy($user)->orderByDesc('started_on')->limit(12)->get() : collect(),
         ]);
