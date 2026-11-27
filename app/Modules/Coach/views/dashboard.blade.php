@@ -7,6 +7,24 @@
 
 @section('content')
 <div class="stack">
+  @if ($fitness)
+    {{-- Fitness : raccourci vers l'onglet, avec la dernière séance --}}
+    <a class="card fitness-link" href="{{ route('coach.fitness.index') }}">
+      <span class="tile-icon">@include('coach::partials.icon', ['name' => 'dumbbell'])</span>
+      <span>
+        <strong>Fitness</strong><br>
+        <span class="muted small">
+          @if ($lastWorkout)
+            Dernière séance {{ $lastWorkout->performed_on->locale('fr')->isoFormat('ddd D MMM') }} · {{ $lastWorkout->totalLoadLabel() }} soulevés
+          @else
+            Ta salle, tes exercices et tes séances
+          @endif
+        </span>
+      </span>
+      <span class="fitness-arrow" aria-hidden="true">›</span>
+    </a>
+  @endif
+
   {{-- Objectif --}}
   <section class="card hero" aria-labelledby="goal-title">
     @if ($goal)

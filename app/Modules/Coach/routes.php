@@ -10,6 +10,8 @@ use App\Modules\Coach\Http\Controllers\ChatController;
 use App\Modules\Coach\Http\Controllers\DashboardController;
 use App\Modules\Coach\Http\Controllers\ExploitController;
 use App\Modules\Coach\Http\Controllers\FeedbackController;
+use App\Modules\Coach\Http\Controllers\Fitness\GymController;
+use App\Modules\Coach\Http\Controllers\Fitness\WorkoutController;
 use App\Modules\Coach\Http\Controllers\GarminController;
 use App\Modules\Coach\Http\Controllers\GoalController;
 use App\Modules\Coach\Http\Controllers\GoogleHealthController;
@@ -72,6 +74,23 @@ Route::post('running/courses/{activity}/seance', [AfterRunController::class, 'co
 Route::delete('running/courses/{activity}/seance', [AfterRunController::class, 'dismissSession'])->name('running.activities.session.dismiss');
 Route::post('running/seances/{session}/annuler', [SessionController::class, 'cancel'])->name('running.sessions.cancel');
 
+// Fitness : réservé aux comptes à qui le sous-module est ouvert.
+Route::prefix('fitness')->name('fitness.')->middleware('can:coach-fitness')->group(function () {
+    Route::get('/', [WorkoutController::class, 'index'])->name('index');
+    Route::get('seances/nouvelle', [WorkoutController::class, 'create'])->name('workouts.create');
+    Route::post('seances', [WorkoutController::class, 'store'])->name('workouts.store');
+    Route::get('seances/{workout}', [WorkoutController::class, 'show'])->whereNumber('workout')->name('workouts.show');
+    Route::delete('seances/{workout}', [WorkoutController::class, 'destroy'])->name('workouts.destroy');
+
+    Route::get('salle', [GymController::class, 'index'])->name('gym');
+    Route::post('salle/machines', [GymController::class, 'storeEquipment'])->name('equipment.store');
+    Route::patch('salle/machines/{equipment}', [GymController::class, 'updateEquipment'])->name('equipment.update');
+    Route::delete('salle/machines/{equipment}', [GymController::class, 'destroyEquipment'])->name('equipment.destroy');
+    Route::post('salle/exercices', [GymController::class, 'storeExercise'])->name('exercises.store');
+    Route::put('salle/exercices/{exercise}', [GymController::class, 'updateExercise'])->name('exercises.update');
+    Route::delete('salle/exercices/{exercise}', [GymController::class, 'destroyExercise'])->name('exercises.destroy');
+});
+
 Route::get('exploits', ExploitController::class)->name('exploits');
 
 Route::get('chat', [ChatController::class, 'index'])->name('chat.index');
@@ -81,3 +100,4 @@ Route::post('chat/{conversation}/messages', [ChatController::class, 'reply'])->m
 
 Route::post('propositions/{proposal}/accepter', [ProposalController::class, 'accept'])->name('proposals.accept');
 Route::post('propositions/{proposal}/refuser', [ProposalController::class, 'refuse'])->name('proposals.refuse');
+Route::post('propositions/{proposal}/exercices/{index}', [ProposalController::class, 'answerExercise'])->whereNumber('index')->name('proposals.exercise');

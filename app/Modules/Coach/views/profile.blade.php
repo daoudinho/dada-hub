@@ -140,6 +140,31 @@
     <textarea name="other_activities" maxlength="1000" placeholder="Vélo 1 h le week-end, travail debout toute la journée…">{{ old('other_activities', $profile->other_activities) }}</textarea>
   </label>
 
+  @if ($fitness)
+    <h2 id="fitness">Fitness</h2>
+    <div class="row">
+      <label class="field">
+        <span>Objectif</span>
+        <select name="fitness_goal">
+          <option value="">—</option>
+          @foreach (Profile::FITNESS_GOALS as $value => $label)<option value="{{ $value }}" @selected(old('fitness_goal', $profile->fitness_goal) === $value)>{{ $label }}</option>@endforeach
+        </select>
+      </label>
+      <label class="field">
+        <span>Niveau</span>
+        <select name="fitness_level">
+          <option value="">—</option>
+          @foreach (Profile::FITNESS_LEVELS as $value => $label)<option value="{{ $value }}" @selected(old('fitness_level', $profile->fitness_level) === $value)>{{ $label }}</option>@endforeach
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="field"><span>Séances par semaine</span><input type="number" name="fitness_sessions_per_week" min="1" max="7" value="{{ old('fitness_sessions_per_week', $profile->fitness_sessions_per_week) }}"></label>
+      <label class="field"><span>Durée d'une séance (min)</span><input type="number" name="fitness_session_minutes" min="15" max="240" value="{{ old('fitness_session_minutes', $profile->fitness_session_minutes) }}"></label>
+    </div>
+    <p class="muted small">Le coach part de là pour te proposer des exercices et, plus tard, un programme. Tes machines, il les découvre avec toi.</p>
+  @endif
+
   <div class="actions"><button class="btn">Enregistrer</button></div>
 </form>
 

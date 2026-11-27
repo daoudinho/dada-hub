@@ -17,10 +17,15 @@ class Profile extends Model
 
     public const SLOTS = ['morning' => 'Matin', 'lunch' => 'Midi', 'evening' => 'Soir', 'any' => 'Variable'];
 
+    public const FITNESS_GOALS = ['strength' => 'Force', 'muscle' => 'Prise de muscle', 'weight_loss' => 'Perte de poids', 'running' => 'Renfo pour la course', 'general' => 'Forme générale'];
+
+    public const FITNESS_LEVELS = ['beginner' => 'Débutant', 'intermediate' => 'Intermédiaire', 'advanced' => 'Confirmé'];
+
     protected $table = 'coach_profiles';
 
     protected $fillable = ['sex', 'birth_date', 'height_cm', 'resting_hr', 'max_hr', 'running_since', 'other_activities',
-        'availability', 'availability_notes', 'long_run_day', 'cycle_tracking', 'hormonal_contraception', 'threshold_hr', 'hr_zone_floors', 'vo2max', 'vo2max_on'];
+        'availability', 'availability_notes', 'long_run_day', 'cycle_tracking', 'hormonal_contraception', 'threshold_hr', 'hr_zone_floors', 'vo2max', 'vo2max_on',
+        'fitness_goal', 'fitness_level', 'fitness_sessions_per_week', 'fitness_session_minutes'];
 
     protected $casts = [
         'birth_date' => 'date',
@@ -35,6 +40,8 @@ class Profile extends Model
         'hr_zone_floors' => 'array',
         'vo2max' => 'float',
         'vo2max_on' => 'date',
+        'fitness_sessions_per_week' => 'integer',
+        'fitness_session_minutes' => 'integer',
     ];
 
     public function age(): ?int
